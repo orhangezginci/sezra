@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sezra.local/contracts/event_envelope.schema.json",
+  "title": "SEZRA EventEnvelope",
+  "type": "object",
+  "required": [
+    "event_id",
+    "event_type",
+    "source",
+    "occurred_at",
+    "payload"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlation_id": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "causation_id": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

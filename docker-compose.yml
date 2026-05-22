@@ -1,0 +1,74 @@
+services:
+  python-service-base:
+    image: sezra-python-service-base
+    build:
+      context: .
+      dockerfile: docker/python-service.Dockerfile
+    profiles:
+      - build
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: sezra-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: sezra
+      RABBITMQ_DEFAULT_PASS: sezra
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  postgres:
+    image: postgres:16
+    container_name: sezra-postgres
+    environment:
+      POSTGRES_USER: sezra
+      POSTGRES_PASSWORD: sezra
+      POSTGRES_DB: sezra
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  event-store-service:
+    build:
+      context: .
+      dockerfile: services/event-store-service/Dockerfile
+    container_name: sezra-event-store-service
+    depends_on:
+      - rabbitmq
+      - postgres
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: sezra
+      RABBITMQ_PASSWORD: sezra
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: sezra
+      POSTGRES_PASSWORD: sezra
+      POSTGRES_DB: sezra
+    volumes:
+      - ./services/event-store-service:/app
+  json-file-adapter:
+    build:
+      context: .
+      dockerfile: services/json-file-adapter/Dockerfile
+    container_name: sezra-json-file-adapter
+    depends_on:
+      - rabbitmq
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: sezra
+      RABBITMQ_PASSWORD: sezra
+      INPUT_FOLDER: /data/inbox
+      PROCESSED_FOLDER: /data/processed
+    volumes:
+      - ./services/json-file-adapter:/app
+      - ./data/json-inbox:/data/inbox
+      - ./data/json-processed:/data/processed
+        
+volumes:
+  rabbitmq_data:
+  postgres_data:
