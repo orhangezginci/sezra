@@ -68,6 +68,21 @@ services:
       - ./services/json-file-adapter:/app
       - ./data/json-inbox:/data/inbox
       - ./data/json-processed:/data/processed
+  
+  anomaly-detector-service:
+    build:
+      context: .
+      dockerfile: services/anomaly-detector-service/Dockerfile
+    container_name: sezra-anomaly-detector-service
+    depends_on:
+      - rabbitmq
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: sezra
+      RABBITMQ_PASSWORD: sezra
+    volumes:
+      - ./services/anomaly-detector-service:/app
         
 volumes:
   rabbitmq_data:

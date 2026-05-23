@@ -1,9 +1,10 @@
 import json
 import os
+import shutil
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
-import shutil
 
 import pika
 
@@ -34,13 +35,18 @@ def connect_to_rabbitmq() -> pika.BlockingConnection:
         password=RABBITMQ_PASSWORD,
     )
 
-    return pika.BlockingConnection(
-        pika.ConnectionParameters(
-            host=RABBITMQ_HOST,
-            port=RABBITMQ_PORT,
-            credentials=credentials,
-        )
-    )
+    while True:
+        try:
+            return pika.BlockingConnection(
+                pika.ConnectionParameters(
+                    host=RABBITMQ_HOST,
+                    port=RABBITMQ_PORT,
+                    credentials=credentials,
+                )
+            )
+        except pika.exceptions.AMQPConnectionError:
+            print("RabbitMQ not ready yet. Retrying...")
+            time.sleep(3)
 
 
 def main() -> None:
@@ -95,8 +101,8 @@ def main() -> None:
         shutil.move(str(json_file), str(processed_file))
 
         print(f"Moved file to processed: {processed_file.name}")
-    
-        connection.close()
+
+    connection.close()
     print("RabbitMQ connection closed")
 
 
