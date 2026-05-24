@@ -30,14 +30,40 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  event-store-migrations:
+    build:
+      context: .
+      dockerfile: services/event-store-service/Dockerfile
+    container_name: sezra-event-store-migrations
+    depends_on:
+      - postgres
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: sezra
+      POSTGRES_PASSWORD: sezra
+      POSTGRES_DB: sezra
+    volumes:
+      - ./services/event-store-service:/app
+    command: >
+      sh -c "
+        python wait_for_postgres.py &&
+        alembic upgrade head
+      "
+
   event-store-service:
     build:
       context: .
       dockerfile: services/event-store-service/Dockerfile
     container_name: sezra-event-store-service
     depends_on:
-      - rabbitmq
-      - postgres
+      rabbitmq:
+        condition: service_started
+      postgres:
+        condition: service_started
+      event-store-migrations:
+        condition: service_completed_successfully
     environment:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
@@ -50,6 +76,7 @@ services:
       POSTGRES_DB: sezra
     volumes:
       - ./services/event-store-service:/app
+
   json-file-adapter:
     build:
       context: .
@@ -68,7 +95,7 @@ services:
       - ./services/json-file-adapter:/app
       - ./data/json-inbox:/data/inbox
       - ./data/json-processed:/data/processed
-  
+
   anomaly-detector-service:
     build:
       context: .
@@ -83,7 +110,22 @@ services:
       RABBITMQ_PASSWORD: sezra
     volumes:
       - ./services/anomaly-detector-service:/app
-        
+
+  analyzer-service:
+    build:
+      context: .
+      dockerfile: services/analyzer-service/Dockerfile
+    container_name: sezra-analyzer-service
+    depends_on:
+      - rabbitmq
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: sezra
+      RABBITMQ_PASSWORD: sezra
+    volumes:
+      - ./services/analyzer-service:/app
+
 volumes:
   rabbitmq_data:
   postgres_data:
