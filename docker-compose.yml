@@ -145,7 +145,32 @@ services:
       POSTGRES_DB: sezra
     volumes:
       - ./services/api-service:/app
-
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: sezra-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+  embedding-service:
+    build:
+      context: .
+      dockerfile: services/embedding-service/Dockerfile
+    container_name: sezra-embedding-service
+    depends_on:
+      - rabbitmq
+      - qdrant
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: sezra
+      RABBITMQ_PASSWORD: sezra
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+    volumes:
+      - ./services/embedding-service:/app
 volumes:
   rabbitmq_data:
   postgres_data:
+  qdrant_data:
