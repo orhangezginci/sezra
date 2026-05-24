@@ -125,6 +125,26 @@ services:
       RABBITMQ_PASSWORD: sezra
     volumes:
       - ./services/analyzer-service:/app
+  api-service:
+    build:
+      context: .
+      dockerfile: services/api-service/Dockerfile
+    container_name: sezra-api-service
+    depends_on:
+      postgres:
+        condition: service_started
+      event-store-migrations:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: sezra
+      POSTGRES_PASSWORD: sezra
+      POSTGRES_DB: sezra
+    volumes:
+      - ./services/api-service:/app
 
 volumes:
   rabbitmq_data:
