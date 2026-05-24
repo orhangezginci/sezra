@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import desc
 
+
 from database import SessionLocal
 from models import StoredEventEnvelope
 
