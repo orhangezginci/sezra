@@ -5,6 +5,7 @@ import time
 import pika
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
+from sentence_transformers import SentenceTransformer
 
 
 def required_env(name: str) -> str:
@@ -29,6 +30,7 @@ QUEUE_NAME = "sezra.queue.embedding"
 
 COLLECTION_NAME = "sezra_events"
 VECTOR_SIZE = 384
+MODEL_NAME = "all-MiniLM-L6-v2"
 
 
 def connect_to_rabbitmq() -> pika.BlockingConnection:
@@ -70,12 +72,24 @@ def ensure_collection(qdrant_client: QdrantClient) -> None:
         print(f"Qdrant collection already exists: {COLLECTION_NAME}")
 
 
-def create_dummy_vector() -> list[float]:
-    return [0.0] * VECTOR_SIZE
+def extract_text(envelope: dict) -> str | None:
+    payload = envelope.get("payload", {})
+
+    if not isinstance(payload, dict):
+        return None
+
+    if "text" in payload:
+        return str(payload["text"])
+
+    return json.dumps(payload, sort_keys=True)
 
 
 def main() -> None:
     print("SEZRA embedding-service started")
+
+    print(f"Loading embedding model: {MODEL_NAME}")
+    model = SentenceTransformer(MODEL_NAME)
+    print("Embedding model loaded")
 
     qdrant_client = QdrantClient(
         host=QDRANT_HOST,
@@ -117,24 +131,34 @@ def main() -> None:
 
             print(f"Received raw event for embedding: {event_id}")
 
+            text = extract_text(envelope)
+
+            if not text:
+                print(f"No embeddable text found for event: {event_id}")
+                channel.basic_ack(delivery_tag=method.delivery_tag)
+                return
+
+            vector = model.encode(text).tolist()
+
             qdrant_client.upsert(
                 collection_name=COLLECTION_NAME,
                 points=[
                     PointStruct(
                         id=event_id,
-                        vector=create_dummy_vector(),
+                        vector=vector,
                         payload={
                             "event_id": event_id,
                             "event_type": envelope.get("event_type"),
                             "source": envelope.get("source"),
                             "occurred_at": envelope.get("occurred_at"),
+                            "text": text,
                             "payload": envelope.get("payload", {}),
                         },
                     )
                 ],
             )
 
-            print(f"Stored dummy vector for event: {event_id}")
+            print(f"Stored embedding vector for event: {event_id}")
 
             channel.basic_ack(delivery_tag=method.delivery_tag)
 
