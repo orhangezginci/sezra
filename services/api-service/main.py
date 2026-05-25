@@ -1,13 +1,26 @@
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import desc
+import os
 
+from qdrant_client import QdrantClient
+from sentence_transformers import SentenceTransformer
 
 from database import SessionLocal
 from models import StoredEventEnvelope
 
+QDRANT_HOST = os.getenv("QDRANT_HOST", "qdrant")
+QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
 
+COLLECTION_NAME = "sezra_events"
+MODEL_NAME = "all-MiniLM-L6-v2"
 app = FastAPI(title="SEZRA API")
 
+qdrant_client = QdrantClient(
+    host=QDRANT_HOST,
+    port=QDRANT_PORT,
+)
+
+embedding_model = SentenceTransformer(MODEL_NAME)
 
 @app.get("/health")
 def health():
@@ -131,3 +144,20 @@ def get_events_by_correlation(correlation_id: str, limit: int = 20):
 
     finally:
         session.close()
+@app.get("/semantic/search")
+def semantic_search(query: str, limit: int = 5):
+    vector = embedding_model.encode(query).tolist()
+
+    response = qdrant_client.query_points(
+        collection_name=COLLECTION_NAME,
+        query=vector,
+        limit=limit,
+    )
+
+    return [
+        {
+            "score": point.score,
+            "payload": point.payload,
+        }
+        for point in response.points
+    ]

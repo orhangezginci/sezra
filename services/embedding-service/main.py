@@ -81,8 +81,25 @@ def extract_text(envelope: dict) -> str | None:
     if "text" in payload:
         return str(payload["text"])
 
-    return json.dumps(payload, sort_keys=True)
+    parts = []
 
+    metric = payload.get("metric")
+    value = payload.get("value")
+    grade_level = payload.get("grade_level")
+
+    if metric is not None:
+        parts.append(f"Metric {metric}")
+
+    if grade_level is not None:
+        parts.append(f"for grade level {grade_level}")
+
+    if value is not None:
+        parts.append(f"has value {value}")
+
+    if parts:
+        return " ".join(parts) + "."
+
+    return json.dumps(payload, sort_keys=True)
 
 def main() -> None:
     print("SEZRA embedding-service started")

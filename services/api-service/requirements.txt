@@ -1,3 +1,6 @@
 -r ../../requirements/base.txt
 -r ../../requirements/api.txt
 -r ../../requirements/database.txt
+
+qdrant-client
+sentence-transformers
