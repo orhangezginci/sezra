@@ -97,6 +97,8 @@ services:
       - ./data/json-processed:/data/processed
 
   anomaly-detector-service:
+    profiles:
+      - legacy-detector
     build:
       context: .
       dockerfile: services/anomaly-detector-service/Dockerfile
@@ -110,7 +112,22 @@ services:
       RABBITMQ_PASSWORD: sezra
     volumes:
       - ./services/anomaly-detector-service:/app
-
+  drop-detector-service:
+    profiles:
+      - drop-detector
+    build:
+      context: .
+      dockerfile: services/drop-detector-service/Dockerfile
+    container_name: sezra-drop-detector-service
+    depends_on:
+      - rabbitmq
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: sezra
+      RABBITMQ_PASSWORD: sezra
+    volumes:
+      - ./services/drop-detector-service:/app
   analyzer-service:
     build:
       context: .
