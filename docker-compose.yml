@@ -143,11 +143,16 @@ services:
     depends_on:
       rabbitmq:
         condition: service_started
+      qdrant:
+        condition: service_started
     environment:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: sezra
       RABBITMQ_PASSWORD: sezra
+
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
     volumes:
       - ./services/analyzer-service:/app
 

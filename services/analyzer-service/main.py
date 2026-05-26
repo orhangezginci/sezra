@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 import pika
+from qdrant_client import QdrantClient
+from sentence_transformers import SentenceTransformer
 
 
 def required_env(name: str) -> str:
@@ -15,6 +17,12 @@ def required_env(name: str) -> str:
 
     return value
 
+
+QDRANT_HOST = required_env("QDRANT_HOST")
+QDRANT_PORT = int(required_env("QDRANT_PORT"))
+
+COLLECTION_NAME = "sezra_events"
+MODEL_NAME = "all-MiniLM-L6-v2"
 
 RABBITMQ_HOST = required_env("RABBITMQ_HOST")
 RABBITMQ_PORT = int(required_env("RABBITMQ_PORT"))
@@ -66,6 +74,20 @@ def create_analysis_event(anomaly_event: dict) -> dict:
 
 def main() -> None:
     print("SEZRA analyzer-service started")
+
+    print(f"Loading embedding model: {MODEL_NAME}")
+    embedding_model = SentenceTransformer(MODEL_NAME)
+    print("Embedding model loaded")
+
+    qdrant_client = QdrantClient(
+        host=QDRANT_HOST,
+        port=QDRANT_PORT,
+    )
+
+    collections = qdrant_client.get_collections()
+
+    print("Connected to Qdrant")
+    print(f"Collections: {collections}")
 
     connection = connect_to_rabbitmq()
     channel = connection.channel()
