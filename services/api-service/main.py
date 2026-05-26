@@ -3,6 +3,8 @@ from sqlalchemy import desc
 import os
 
 from qdrant_client import QdrantClient
+from qdrant_client.models import FieldCondition, Filter, MatchValue
+
 from sentence_transformers import SentenceTransformer
 
 from database import SessionLocal
@@ -145,12 +147,25 @@ def get_events_by_correlation(correlation_id: str, limit: int = 20):
     finally:
         session.close()
 @app.get("/semantic/search")
-def semantic_search(query: str, limit: int = 5):
+def semantic_search(query: str, limit: int = 5, source_type: str | None = None):
     vector = embedding_model.encode(query).tolist()
+
+    query_filter = None
+
+    if source_type:
+        query_filter = Filter(
+            must=[
+                FieldCondition(
+                    key="source_type",
+                    match=MatchValue(value=source_type),
+                )
+            ]
+        )
 
     response = qdrant_client.query_points(
         collection_name=COLLECTION_NAME,
         query=vector,
+        query_filter=query_filter,
         limit=limit,
     )
 

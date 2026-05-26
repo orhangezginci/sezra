@@ -1,5 +1,5 @@
 # SEZRA
-### *the sensing one*
+### *the sensing one*-Not an alert. Not a summary. An investigation.
 
 > Your systems already know what happened.  
 > SEZRA asks why.

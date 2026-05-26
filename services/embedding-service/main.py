@@ -167,6 +167,7 @@ def main() -> None:
                             "event_id": event_id,
                             "event_type": envelope.get("event_type"),
                             "source": envelope.get("source"),
+                            "source_type": envelope.get("payload", {}).get("source_type"),
                             "occurred_at": envelope.get("occurred_at"),
                             "text": text,
                             "payload": envelope.get("payload", {}),
