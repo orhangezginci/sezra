@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pika
 from qdrant_client import QdrantClient
+from qdrant_client.models import FieldCondition, Filter, MatchValue
 from sentence_transformers import SentenceTransformer
 
 
@@ -54,7 +55,77 @@ def connect_to_rabbitmq() -> pika.BlockingConnection:
             time.sleep(3)
 
 
-def create_analysis_event(anomaly_event: dict) -> dict:
+def build_anomaly_search_text(anomaly_event: dict) -> str:
+    payload = anomaly_event.get("payload", {})
+
+    metric = payload.get("metric")
+    current_value = payload.get("current_value")
+    previous_value = payload.get("previous_value")
+    drop_amount = payload.get("drop_amount")
+    reason = payload.get("reason")
+
+    parts = []
+
+    if metric:
+        parts.append(f"Anomaly detected for metric {metric}.")
+
+    if previous_value is not None and current_value is not None:
+        parts.append(
+            f"The value changed from {previous_value} to {current_value}."
+        )
+
+    if drop_amount is not None:
+        parts.append(f"The detected drop amount is {drop_amount}.")
+
+    if reason:
+        parts.append(f"Reason: {reason}.")
+
+    return " ".join(parts)
+
+
+def search_best_context(
+    qdrant_client: QdrantClient,
+    embedding_model: SentenceTransformer,
+    anomaly_event: dict,
+) -> dict | None:
+    search_text = build_anomaly_search_text(anomaly_event)
+
+    print(f"Semantic anomaly query: {search_text}")
+
+    vector = embedding_model.encode(search_text).tolist()
+
+    response = qdrant_client.query_points(
+        collection_name=COLLECTION_NAME,
+        query=vector,
+        query_filter=Filter(
+            must=[
+                FieldCondition(
+                    key="source_type",
+                    match=MatchValue(value="context"),
+                )
+            ]
+        ),
+        limit=1,
+    )
+
+    if not response.points:
+        return None
+
+    point = response.points[0]
+
+    return {
+        "score": point.score,
+        "event_id": point.payload.get("event_id"),
+        "source": point.payload.get("source"),
+        "text": point.payload.get("text"),
+        "payload": point.payload.get("payload"),
+    }
+
+
+def create_analysis_event(
+    anomaly_event: dict,
+    best_context: dict | None,
+) -> dict:
     anomaly_event_id = anomaly_event["event_id"]
 
     return {
@@ -65,8 +136,9 @@ def create_analysis_event(anomaly_event: dict) -> dict:
         "correlation_id": anomaly_event_id,
         "causation_id": anomaly_event_id,
         "payload": {
-            "summary": "Static MVP analysis placeholder",
+            "summary": "Best-effort MVP causal context retrieval",
             "anomaly_event_id": anomaly_event_id,
+            "best_context": best_context,
             "confidence": 0.5,
         },
     }
@@ -128,7 +200,18 @@ def main() -> None:
 
             print(f"Received anomaly event: {event_id}")
 
-            analysis_event = create_analysis_event(anomaly_event)
+            best_context = search_best_context(
+                qdrant_client=qdrant_client,
+                embedding_model=embedding_model,
+                anomaly_event=anomaly_event,
+            )
+
+            print(f"Best context: {best_context}")
+
+            analysis_event = create_analysis_event(
+                anomaly_event=anomaly_event,
+                best_context=best_context,
+            )
 
             channel.basic_publish(
                 exchange=ANALYSIS_EXCHANGE,

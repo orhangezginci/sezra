@@ -1,13 +1,16 @@
 import json
 import os
 import time
-
-import pika
 from datetime import datetime, timezone
 from uuid import uuid4
 
+import pika
+
+
 last_values: dict[str, float] = {}
 DROP_THRESHOLD = 10
+
+
 def required_env(name: str) -> str:
     value = os.getenv(name)
 
@@ -46,10 +49,20 @@ def connect_to_rabbitmq() -> pika.BlockingConnection:
             print("RabbitMQ not ready yet. Retrying...")
             time.sleep(3)
 
+
 def detect_drop(envelope: dict) -> dict | None:
     payload = envelope.get("payload", {})
 
     if not isinstance(payload, dict):
+        return None
+
+    source_type = payload.get("source_type")
+
+    if source_type != "observation":
+        print(
+            f"Ignored non-observation event: "
+            f"source_type={source_type}"
+        )
         return None
 
     metric = payload.get("metric")
@@ -97,6 +110,7 @@ def detect_drop(envelope: dict) -> dict | None:
         },
     }
 
+
 def main() -> None:
     print("SEZRA drop-detector-service started")
 
@@ -138,6 +152,7 @@ def main() -> None:
                 return
 
             print(f"Received raw event: {event_id}")
+
             anomaly_event = detect_drop(envelope)
 
             if anomaly_event is None:
@@ -148,6 +163,7 @@ def main() -> None:
                 f"Drop anomaly detected for metric: "
                 f"{anomaly_event['payload']['metric']}"
             )
+
             channel.basic_publish(
                 exchange=ANOMALY_EXCHANGE,
                 routing_key="",
@@ -159,6 +175,7 @@ def main() -> None:
             )
 
             print(f"Published anomaly event: {anomaly_event['event_id']}")
+
             channel.basic_ack(delivery_tag=method.delivery_tag)
 
         except json.JSONDecodeError as error:

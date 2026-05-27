@@ -26,11 +26,8 @@ services:
       POSTGRES_USER: sezra
       POSTGRES_PASSWORD: sezra
       POSTGRES_DB: sezra
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
   event-store-migrations:
     build:
       context: .

@@ -101,6 +101,7 @@ def extract_text(envelope: dict) -> str | None:
 
     return json.dumps(payload, sort_keys=True)
 
+
 def main() -> None:
     print("SEZRA embedding-service started")
 
@@ -156,6 +157,7 @@ def main() -> None:
                 return
 
             vector = model.encode(text).tolist()
+            payload = envelope.get("payload", {})
 
             qdrant_client.upsert(
                 collection_name=COLLECTION_NAME,
@@ -167,10 +169,10 @@ def main() -> None:
                             "event_id": event_id,
                             "event_type": envelope.get("event_type"),
                             "source": envelope.get("source"),
-                            "source_type": envelope.get("payload", {}).get("source_type"),
+                            "source_type": payload.get("source_type"),
                             "occurred_at": envelope.get("occurred_at"),
                             "text": text,
-                            "payload": envelope.get("payload", {}),
+                            "payload": payload,
                         },
                     )
                 ],
