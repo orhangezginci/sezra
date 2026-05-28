@@ -83,11 +83,11 @@ def build_anomaly_search_text(anomaly_event: dict) -> str:
     return " ".join(parts)
 
 
-def search_best_context(
+def search_related_contexts(
     qdrant_client: QdrantClient,
     embedding_model: SentenceTransformer,
     anomaly_event: dict,
-) -> dict | None:
+) -> list[dict]:
     search_text = build_anomaly_search_text(anomaly_event)
 
     print(f"Semantic anomaly query: {search_text}")
@@ -108,20 +108,26 @@ def search_best_context(
         limit=1,
     )
 
-    if not response.points:
-        return None
+    related_contexts = []
 
-    point = response.points[0]
+    for point in response.points:
+        related_contexts.append(
+            {
+                "score": point.score,
+                "event_id": point.payload.get("event_id"),
+                "source": point.payload.get("source"),
+                "text": point.payload.get("text"),
+                "payload": point.payload.get("payload"),
+            }
+        )
 
-    return {
-        "score": point.score,
-        "event_id": point.payload.get("event_id"),
-        "source": point.payload.get("source"),
-        "text": point.payload.get("text"),
-        "payload": point.payload.get("payload"),
-    }
+    return related_contexts
 
-def build_summary(anomaly_event: dict, best_context: dict | None) -> str:
+
+def build_summary(
+    anomaly_event: dict,
+    related_contexts: list[dict],
+) -> str:
     payload = anomaly_event.get("payload", {})
 
     metric = payload.get("metric", "unknown metric")
@@ -137,7 +143,9 @@ def build_summary(anomaly_event: dict, best_context: dict | None) -> str:
     if drop_amount is not None:
         summary += f" Detected change amount: {drop_amount}."
 
-    if best_context:
+    if related_contexts:
+        best_context = related_contexts[0]
+
         summary += (
             " The most relevant contextual event found was: "
             f'"{best_context.get("text")}".'
@@ -147,12 +155,14 @@ def build_summary(anomaly_event: dict, best_context: dict | None) -> str:
 
     return summary
 
+
 def create_analysis_event(
     anomaly_event: dict,
-    best_context: dict | None,
+    related_contexts: list[dict],
 ) -> dict:
     anomaly_event_id = anomaly_event["event_id"]
-    summary = build_summary(anomaly_event, best_context)
+    summary = build_summary(anomaly_event, related_contexts)
+
     return {
         "event_id": str(uuid4()),
         "event_type": "CausalAnalysisResult",
@@ -163,7 +173,7 @@ def create_analysis_event(
         "payload": {
             "summary": summary,
             "anomaly_event_id": anomaly_event_id,
-            "best_context": best_context,
+            "related_contexts": related_contexts,
             "confidence": 0.5,
         },
     }
@@ -225,17 +235,17 @@ def main() -> None:
 
             print(f"Received anomaly event: {event_id}")
 
-            best_context = search_best_context(
+            related_contexts = search_related_contexts(
                 qdrant_client=qdrant_client,
                 embedding_model=embedding_model,
                 anomaly_event=anomaly_event,
             )
 
-            print(f"Best context: {best_context}")
+            print(f"Related contexts: {related_contexts}")
 
             analysis_event = create_analysis_event(
                 anomaly_event=anomaly_event,
-                best_context=best_context,
+                related_contexts=related_contexts,
             )
 
             channel.basic_publish(
