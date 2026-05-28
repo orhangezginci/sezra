@@ -105,18 +105,26 @@ def search_related_contexts(
                 )
             ]
         ),
-        limit=1,
+        limit=3,
     )
 
+    seen_texts = set()
     related_contexts = []
 
     for point in response.points:
+        text = point.payload.get("text")
+
+        if text in seen_texts:
+            continue
+
+        seen_texts.add(text)
+
         related_contexts.append(
             {
                 "score": point.score,
                 "event_id": point.payload.get("event_id"),
                 "source": point.payload.get("source"),
-                "text": point.payload.get("text"),
+                "text": text,
                 "payload": point.payload.get("payload"),
             }
         )
