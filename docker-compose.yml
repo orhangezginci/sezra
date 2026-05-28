@@ -14,8 +14,8 @@ services:
       - "5672:5672"
       - "15672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: sezra
-      RABBITMQ_DEFAULT_PASS: sezra
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
 
@@ -23,9 +23,9 @@ services:
     image: postgres:16
     container_name: sezra-postgres
     environment:
-      POSTGRES_USER: sezra
-      POSTGRES_PASSWORD: sezra
-      POSTGRES_DB: sezra
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
   event-store-migrations:
@@ -36,11 +36,11 @@ services:
     depends_on:
       - postgres
     environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_USER: sezra
-      POSTGRES_PASSWORD: sezra
-      POSTGRES_DB: sezra
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_USER:  ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - ./services/event-store-service:/app
     command: >
@@ -62,16 +62,16 @@ services:
       event-store-migrations:
         condition: service_completed_successfully
     environment:
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: sezra
-      RABBITMQ_PASSWORD: sezra
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
 
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_USER: sezra
-      POSTGRES_PASSWORD: sezra
-      POSTGRES_DB: sezra
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - ./services/event-store-service:/app
 
@@ -84,10 +84,10 @@ services:
       rabbitmq:
         condition: service_started
     environment:
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: sezra
-      RABBITMQ_PASSWORD: sezra
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
 
       INPUT_FOLDER: /data/inbox
       PROCESSED_FOLDER: /data/processed
@@ -109,8 +109,8 @@ services:
     environment:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
-      RABBITMQ_USER: sezra
-      RABBITMQ_PASSWORD: sezra
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
     volumes:
       - ./services/anomaly-detector-service:/app
 
@@ -127,11 +127,29 @@ services:
     environment:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
-      RABBITMQ_USER: sezra
-      RABBITMQ_PASSWORD: sezra
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
     volumes:
       - ./services/drop-detector-service:/app
+  spike-detector-service:
+    build:
+      context: .
+      dockerfile: services/spike-detector-service/Dockerfile
 
+    container_name: sezra-spike-detector-service
+
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+
+    depends_on:
+      rabbitmq:
+        condition: service_started
+
+    profiles:
+      - spike-detectors
   analyzer-service:
     build:
       context: .
@@ -145,8 +163,8 @@ services:
     environment:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
-      RABBITMQ_USER: sezra
-      RABBITMQ_PASSWORD: sezra
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
 
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
@@ -173,13 +191,13 @@ services:
       qdrant:
         condition: service_started
     environment:
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: sezra
-      RABBITMQ_PASSWORD: sezra
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
 
-      QDRANT_HOST: qdrant
-      QDRANT_PORT: 6333
+      QDRANT_HOST: ${QDRANT_HOST}
+      QDRANT_PORT: ${QDRANT_PORT}
     volumes:
       - ./services/embedding-service:/app
 
@@ -198,11 +216,11 @@ services:
     ports:
       - "8000:8000"
     environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_USER: sezra
-      POSTGRES_PASSWORD: sezra
-      POSTGRES_DB: sezra
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
 
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333

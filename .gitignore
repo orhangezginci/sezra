@@ -7,3 +7,4 @@ data/json-inbox/*
 data/json-processed/*
 !data/json-inbox/.gitkeep
 !data/json-processed/.gitkeep
+.env
