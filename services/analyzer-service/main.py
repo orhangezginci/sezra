@@ -121,13 +121,38 @@ def search_best_context(
         "payload": point.payload.get("payload"),
     }
 
+def build_summary(anomaly_event: dict, best_context: dict | None) -> str:
+    payload = anomaly_event.get("payload", {})
+
+    metric = payload.get("metric", "unknown metric")
+    previous_value = payload.get("previous_value")
+    current_value = payload.get("current_value")
+    drop_amount = payload.get("drop_amount")
+
+    summary = (
+        f'SEZRA detected an anomaly for metric "{metric}". '
+        f"The value changed from {previous_value} to {current_value}."
+    )
+
+    if drop_amount is not None:
+        summary += f" Detected change amount: {drop_amount}."
+
+    if best_context:
+        summary += (
+            " The most relevant contextual event found was: "
+            f'"{best_context.get("text")}".'
+        )
+    else:
+        summary += " No relevant contextual event was found."
+
+    return summary
 
 def create_analysis_event(
     anomaly_event: dict,
     best_context: dict | None,
 ) -> dict:
     anomaly_event_id = anomaly_event["event_id"]
-
+    summary = build_summary(anomaly_event, best_context)
     return {
         "event_id": str(uuid4()),
         "event_type": "CausalAnalysisResult",
@@ -136,7 +161,7 @@ def create_analysis_event(
         "correlation_id": anomaly_event_id,
         "causation_id": anomaly_event_id,
         "payload": {
-            "summary": "Best-effort MVP causal context retrieval",
+            "summary": summary,
             "anomaly_event_id": anomaly_event_id,
             "best_context": best_context,
             "confidence": 0.5,
