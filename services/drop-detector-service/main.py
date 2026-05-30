@@ -100,6 +100,7 @@ def detect_drop(envelope: dict) -> dict | None:
         "correlation_id": envelope["event_id"],
         "causation_id": envelope["event_id"],
         "payload": {
+            "anomaly_type": "drop",
             "metric": metric,
             "previous_value": previous_value,
             "current_value": current_value,

@@ -99,6 +99,7 @@ def create_anomaly_event(
         "correlation_id": envelope["event_id"],
         "causation_id": envelope["event_id"],
         "payload": {
+            "anomaly_type": "spike",
             "metric": metric,
             "previous_value": previous_value,
             "current_value": current_value,

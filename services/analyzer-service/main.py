@@ -137,14 +137,20 @@ def build_summary(
     related_contexts: list[dict],
 ) -> str:
     payload = anomaly_event.get("payload", {})
-
+    anomaly_type = payload.get("anomaly_type")
     metric = payload.get("metric", "unknown metric")
     previous_value = payload.get("previous_value")
     current_value = payload.get("current_value")
     drop_amount = payload.get("drop_amount")
 
+    anomaly_label = (
+        f"{anomaly_type} anomaly"
+        if anomaly_type
+        else "anomaly"
+    )
+
     summary = (
-        f'SEZRA detected an anomaly for metric "{metric}". '
+        f'SEZRA detected a {anomaly_label} for metric "{metric}". '
         f"The value changed from {previous_value} to {current_value}."
     )
 
@@ -162,7 +168,6 @@ def build_summary(
         summary += " No relevant contextual event was found."
 
     return summary
-
 
 def create_analysis_event(
     anomaly_event: dict,
