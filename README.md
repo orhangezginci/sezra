@@ -1,216 +1,340 @@
 # SEZRA
-### *the sensing one*-Not an alert. Not a summary. An investigation.
 
-> Your systems already know what happened.  
-> SEZRA asks why.
+SEZRA is a hyper-decoupled event-driven causal analysis platform.
 
----
+The goal of SEZRA is to correlate anomalies in structured telemetry with semantically related contextual events from completely different data sources.
 
-Most monitoring tools will tell you that math test scores dropped on Tuesday.
+SEZRA combines:
 
-None of them will tell you it's because the school changed its start time to 7:30 AM the week before — and that information was sitting in an email the whole time.
-
-**That gap — between *detecting* an event and *understanding* its cause — is what SEZRA is built to close.**
-
----
-
-## The Problem Nobody Is Solving Well
-
-Modern systems generate enormous amounts of isolated data:
-metrics, logs, emails, ERP events, sensor telemetry, support tickets, business KPIs.
-
-Most monitoring systems answer: **what happened?**  
-Most LLM wrappers answer: **what does this data say?**
-
-Neither answers the question that actually matters:
-
-```
-WHY did it happen?
-```
-
-The answer is almost never in a single data source.  
-It lives in the *relationship between signals* — across time, across systems, across context.
-
-That's a causal reasoning problem. Not a search problem. Not a summarization problem.
+- Event-driven architecture
+- Semantic vector search
+- Context retrieval
+- Independent anomaly detectors
+- Fully asynchronous processing
 
 ---
 
-## What SEZRA Does
-
-SEZRA ingests raw telemetry, logs, metrics, documents, emails, and external signals —  
-detects anomalies, builds semantic memory, and reconstructs plausible causal chains.
-
-```
-Observe reality           →  raw event ingestion from any source
-Detect anomalies          →  pluggable statistical detectors
-Search context            →  semantic memory via vector embeddings
-Reconstruct causality     →  causal chain analysis across correlated events
-Assist investigation      →  LLM reasoning on top of structured evidence
-```
-
-The LLM is the **last step** — not the whole pipeline.  
-The 80% that makes it reliable happens before it.
-
----
-
-## A Concrete Example
-
-A school reports a sharp drop in 8th grade math scores.
-
-```json
-{ "metric": "math_test_average", "grade_level": 8, "value": 62 }
-```
-
-SEZRA detects the deviation against the baseline.  
-Simultaneously, semantic memory contains an email ingested three days earlier:
-
-```
-Starting next Monday, school begins at 7:30 AM instead of 8:00 AM.
-```
-
-SEZRA surfaces the semantic proximity between these two events.  
-A causal hypothesis emerges — not from hallucination, but from correlated evidence already in your data.
-
-**This is the difference between a monitoring tool and a reasoning engine.**
-
----
-
-## Architecture
+# Architecture Overview
 
 ```mermaid
-flowchart LR
-    A[JSON / External Adapters] --> R[sezra.stream.raw]
+flowchart TD
 
-    R --> E[Event Store Service]
-    E --> P[(PostgreSQL Event Store)]
+    A[JSON File Adapter]
+    B[RabbitMQ Raw Stream]
 
-    R --> D1[Drop Detector]
-    R --> D2[Custom Detectors]
+    C1[Drop Detector Service]
+    C2[Spike Detector Service]
 
-    D1 --> AN[sezra.stream.anomaly]
-    D2 --> AN
+    D[RabbitMQ Anomaly Stream]
 
-    AN --> AS[Analyzer Service]
-    AS --> AR[sezra.stream.analysis]
+    E[Analyzer Service]
+    F[Embedding Service]
 
-    AR --> E
-    AN --> E
-    R --> EM[Embedding Service]
+    G[Qdrant Vector Store]
+    H[PostgreSQL Event Store]
 
-    EM --> Q[(Qdrant Semantic Memory)]
+    I[API Service]
 
-    API[API Service] --> P
-    API --> Q
+    J[Causal Analysis Result]
 
-    U[External Users / Systems] --> API
+    A --> B
+
+    B --> C1
+    B --> C2
+    B --> F
+    B --> H
+
+    C1 --> D
+    C2 --> D
+
+    D --> E
+    D --> H
+
+    F --> G
+
+    E --> G
+    E --> J
+    E --> H
+
+    I --> H
 ```
 
-Three event streams. One causal story.
+Core technologies:
 
-| Stream | Purpose |
-|---|---|
-| `sezra.stream.raw` | Normalized incoming data from any adapter |
-| `sezra.stream.anomaly` | Anomaly events from detector services |
-| `sezra.stream.analysis` | Causal analysis results |
+- RabbitMQ
+- Qdrant
+- PostgreSQL
+- SentenceTransformers
+- Docker Compose
+- Python microservices
 
 ---
 
-## Current Capabilities (MVP)
+# Core Principles
 
-**Durable Event Store**  
-All events persisted in PostgreSQL with full envelope — `event_id`, `event_type`, `source`, `occurred_at`, `correlation_id`, `causation_id`, `payload`.
+- Hyper-decoupled architecture
+- Event-driven communication
+- Domain agnostic design
+- Independent detector services
+- Semantic causal retrieval
+- Context-source agnostic ingestion
+- Fully asynchronous pipeline
 
-**Semantic Memory**  
-Embeddings stored in Qdrant via `sentence-transformers/all-MiniLM-L6-v2`. Context retrieval that understands meaning, not just keywords.
+---
 
-**Pluggable Detector Architecture**  
-Detectors are independent microservices. Any service that listens to `sezra.stream.raw` and publishes to `sezra.stream.anomaly` is a detector. Drop detection, threshold, z-score, ML-based — build and plug in independently.
+# Services
 
-**Semantic Search API**  
+## json-file-adapter
+
+Reads JSON files and publishes normalized events into the raw event stream.
+
+## drop-detector-service
+
+Detects downward metric anomalies.
+
+Example:
+
+```text
+78 → 62
+```
+
+## spike-detector-service
+
+Detects upward spike anomalies.
+
+Example:
+
+```text
+180 → 420
+```
+
+## embedding-service
+
+Generates vector embeddings and stores them in Qdrant.
+
+## analyzer-service
+
+Semantically retrieves contextual events related to anomalies and creates causal analysis results.
+
+## event-store-service
+
+Stores all event envelopes in PostgreSQL.
+
+## api-service
+
+Provides API access to stored events and analysis results.
+
+---
+
+# Environment Configuration
+
+Create a `.env` file:
+
+```env
+RABBITMQ_HOST=rabbitmq
+RABBITMQ_PORT=5672
+RABBITMQ_USER=sezra
+RABBITMQ_PASSWORD=sezra
+
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_USER=sezra
+POSTGRES_PASSWORD=sezra
+POSTGRES_DB=sezra
+
+QDRANT_HOST=qdrant
+QDRANT_PORT=6333
+```
+
+---
+
+# Start SEZRA
+
+School-grade demo profile:
+
 ```bash
-curl "http://localhost:8000/semantic/search?query=math%20grades%20dropped"
+docker compose --profile drop-detectors up --build
 ```
 
----
-
-## Current Services
-
-| Service | Purpose |
-|---|---|
-| `json-file-adapter` | Ingest JSON files into raw event stream |
-| `event-store-service` | Persist all events to PostgreSQL |
-| `drop-detector-service` | Detect value drops against baseline |
-| `anomaly-detector-service` | Threshold-based detection |
-| `analyzer-service` | Produce causal analysis events |
-| `embedding-service` | Generate and store vector embeddings in Qdrant |
-| `api-service` | REST API and semantic search |
-
----
-
-## Quick Start
+DevOps spike demo profile:
 
 ```bash
-git clone https://github.com/orhangezginci/sezra.git
-cd sezra
-
-# Core stack
-docker compose up
-
-# With drop detection
-docker compose --profile drop-detectors up
+docker compose --profile spike-detectors up --build
 ```
 
 ---
 
-## REST API
+# Reset Demo State
+
+Before running demos:
 
 ```bash
-# Health
-curl http://localhost:8000/health
+./scripts/reset-demo-data.sh
+```
 
-# All events
-curl http://localhost:8000/events
+This clears:
 
-# By type
-curl http://localhost:8000/events/type/AnomalyDetected
+- PostgreSQL event store
+- Qdrant collection
+- Processed demo files
 
-# By correlation ID (trace a causal chain)
-curl http://localhost:8000/events/correlation/<correlation_id>
+---
 
-# Semantic search
-curl "http://localhost:8000/semantic/search?query=math%20grades%20dropped"
+# Demo 1 — School Grades
+
+Educational telemetry correlated with contextual email communication.
+
+## Context Event
+
+```text
+"Starting next Monday, school begins at 7:30 AM instead of 8:00 AM."
+```
+
+## Observation Events
+
+Baseline:
+
+```text
+math_test_average = 78
+```
+
+Anomaly:
+
+```text
+math_test_average = 62
+```
+
+## Run Demo
+
+```bash
+./scripts/demo-school.sh
+```
+
+## Expected Result
+
+```text
+SEZRA detected an anomaly for metric "math_test_average".
+The value changed from 78.0 to 62.0.
+The most relevant contextual event found was:
+"Starting next Monday, school begins at 7:30 AM instead of 8:00 AM."
 ```
 
 ---
 
-## Intelligence Progression
+# Demo 2 — DevOps / Jenkins Deployment
 
-SEZRA is designed to evolve incrementally — each stage testable and useful on its own:
+Infrastructure telemetry correlated with deployment events.
 
-```
-rules
-→ statistical detection
-→ semantic retrieval
-→ causal reconstruction
-→ LLM-assisted reasoning
+## Context Event
+
+```text
+"Jenkins deployed checkout-api version 1.12.0 with new request logging middleware."
 ```
 
-No magic. No black boxes. Every layer observable and replaceable.
+## Observation Events
+
+Baseline:
+
+```text
+api_latency_ms = 180
+```
+
+Spike anomaly:
+
+```text
+api_latency_ms = 420
+```
+
+## Run Demo
+
+```bash
+./scripts/demo-devops.sh
+```
+
+## Expected Result
+
+```text
+SEZRA detected an anomaly for metric "api_latency_ms".
+The value changed from 180.0 to 420.0.
+The most relevant contextual event found was:
+"Jenkins deployed checkout-api version 1.12.0 with new request logging middleware."
+```
 
 ---
 
-## Stack
+# Why SEZRA?
 
-Python · FastAPI · RabbitMQ · PostgreSQL · SQLAlchemy · Alembic · Qdrant · SentenceTransformers · Docker Compose
+Traditional monitoring systems detect anomalies.
+
+SEZRA attempts to explain them.
+
+Instead of only detecting that something changed, SEZRA searches semantically related contextual information across independent event streams.
+
+The platform is intentionally domain agnostic:
+
+- education
+- DevOps
+- IoT
+- finance
+- manufacturing
+- healthcare
+- CRM systems
+- support systems
+- external APIs
+
+All domains use the same architecture and pipeline.
 
 ---
 
-## Status
+# Current MVP State
 
-Active experimental MVP. Architecture evolving in small, deliberate steps.
+The current MVP demonstrates:
+
+- Event-driven microservice architecture
+- Independent detector services
+- Semantic vector retrieval
+- Context correlation
+- Human-readable causal summaries
+- Multiple domain scenarios
+- Repeatable demo execution
 
 ---
 
-## License
+# Future Direction
 
-MIT
+Planned future improvements:
+
+- Statistical anomaly detection
+- Rolling baselines
+- Z-score detectors
+- Time-window analysis
+- Multiple related contexts
+- Confidence scoring
+- Streaming ingestion adapters
+- Jira integration
+- Jenkins integration
+- CRM integrations
+- LLM-assisted causal summaries
+- Real-time dashboards
+
+---
+
+# Philosophy
+
+SEZRA is intentionally designed around:
+
+```text
+small services
+simple responsibilities
+event-driven communication
+minimal coupling
+maximum replaceability
+```
+
+The architecture prioritizes:
+
+- scalability
+- replaceability
+- observability
+- independent evolution
+- domain flexibility
