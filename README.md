@@ -19,44 +19,53 @@ SEZRA combines:
 ```mermaid
 flowchart TD
 
-    A[JSON File Adapter]
-    B[RabbitMQ Raw Stream]
+    USER[User / Client]
 
-    C1[Drop Detector Service]
-    C2[Spike Detector Service]
+    A[json-file-adapter]
+    RAW[RabbitMQ: sezra.stream.raw]
 
-    D[RabbitMQ Anomaly Stream]
+    DROP[drop-detector-service]
+    SPIKE[spike-detector-service]
 
-    E[Analyzer Service]
-    F[Embedding Service]
+    ANOMALY[RabbitMQ: sezra.stream.anomaly]
 
-    G[Qdrant Vector Store]
-    H[PostgreSQL Event Store]
+    ANALYZER[analyzer-service]
+    EMBED[embedding-service]
+    STORE[event-store-service]
 
-    I[API Service]
+    API[api-service]
 
-    J[Causal Analysis Result]
+    QDRANT[(Qdrant Vector Store)]
+    POSTGRES[(PostgreSQL Event Store)]
 
-    A --> B
+    RESULT[CausalAnalysisResult Event]
 
-    B --> C1
-    B --> C2
-    B --> F
-    B --> H
+    USER --> API
 
-    C1 --> D
-    C2 --> D
+    API --> POSTGRES
+    API --> QDRANT
 
-    D --> E
-    D --> H
+    A --> RAW
 
-    F --> G
+    RAW --> DROP
+    RAW --> SPIKE
+    RAW --> EMBED
+    RAW --> STORE
 
-    E --> G
-    E --> J
-    E --> H
+    DROP --> ANOMALY
+    SPIKE --> ANOMALY
 
-    I --> H
+    ANOMALY --> ANALYZER
+    ANOMALY --> STORE
+
+    ANALYZER --> QDRANT
+    ANALYZER --> RESULT
+
+    RESULT --> STORE
+
+    EMBED --> QDRANT
+
+    STORE --> POSTGRES
 ```
 
 Core technologies:
@@ -118,11 +127,23 @@ Semantically retrieves contextual events related to anomalies and creates causal
 
 ## event-store-service
 
-Stores all event envelopes in PostgreSQL.
+Stores event envelopes in PostgreSQL.
+
+Currently persisted event types include:
+
+- raw observation/context events
+- anomaly events
+- causal analysis result events
 
 ## api-service
 
-Provides API access to stored events and analysis results.
+Provides API access to:
+
+- stored events
+- analysis results
+- semantic search data
+
+The API service is intentionally separated from the event pipeline and acts purely as a read/query interface.
 
 ---
 
@@ -145,6 +166,8 @@ POSTGRES_DB=sezra
 QDRANT_HOST=qdrant
 QDRANT_PORT=6333
 ```
+
+For public repositories, use `.env.example` as the template and keep the real `.env` file untracked.
 
 ---
 
@@ -297,6 +320,7 @@ The current MVP demonstrates:
 - Human-readable causal summaries
 - Multiple domain scenarios
 - Repeatable demo execution
+- Pluggable detector profiles
 
 ---
 
