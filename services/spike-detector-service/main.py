@@ -1,13 +1,22 @@
 import json
 import os
 import time
-
-import pika
 from datetime import datetime, timezone
 from uuid import uuid4
 
-last_values: dict[str, float] = {}
-SPIKE_THRESHOLD = 100
+import numpy as np
+import pika
+
+
+metric_history: dict[str, list[float]] = {}
+
+MIN_HISTORY_SIZE = 3
+SPIKE_STDDEV_MULTIPLIER = 2
+
+RAW_EXCHANGE = "sezra.stream.raw"
+ANOMALY_EXCHANGE = "sezra.stream.anomaly"
+QUEUE_NAME = "sezra.queue.spike_detector"
+
 
 def required_env(name: str) -> str:
     value = os.getenv(name)
@@ -22,10 +31,6 @@ RABBITMQ_HOST = required_env("RABBITMQ_HOST")
 RABBITMQ_PORT = int(required_env("RABBITMQ_PORT"))
 RABBITMQ_USER = required_env("RABBITMQ_USER")
 RABBITMQ_PASSWORD = required_env("RABBITMQ_PASSWORD")
-
-RAW_EXCHANGE = "sezra.stream.raw"
-ANOMALY_EXCHANGE = "sezra.stream.anomaly"
-QUEUE_NAME = "sezra.queue.spike_detector"
 
 
 def connect_to_rabbitmq() -> pika.BlockingConnection:
@@ -47,6 +52,7 @@ def connect_to_rabbitmq() -> pika.BlockingConnection:
             print("RabbitMQ not ready yet. Retrying...")
             time.sleep(3)
 
+
 def should_process(envelope: dict) -> bool:
     payload = envelope.get("payload", {})
 
@@ -64,24 +70,55 @@ def should_process(envelope: dict) -> bool:
 
     return True
 
+
 def detect_spike(
     metric: str,
     current_value: float,
 ) -> tuple[bool, float | None]:
-    previous_value = last_values.get(metric)
+    history = metric_history.get(metric, [])
 
-    last_values[metric] = current_value
+    if len(history) < MIN_HISTORY_SIZE:
+        history.append(current_value)
+        metric_history[metric] = history
 
-    if previous_value is None:
-        print(f"Baseline initialized for metric: {metric}")
+        print(
+            f"History initialized for metric: {metric} "
+            f"({len(history)}/{MIN_HISTORY_SIZE})"
+        )
+
         return False, None
 
-    increase_amount = current_value - previous_value
+    previous_value = history[-1]
 
-    if increase_amount >= SPIKE_THRESHOLD:
+    mean = np.mean(history)
+    stddev = np.std(history)
+
+    history.append(current_value)
+    metric_history[metric] = history
+
+    if stddev == 0:
+        print(
+            f"Metric={metric} "
+            f"Mean={mean:.2f} "
+            f"StdDev={stddev:.2f} "
+            f"Z-Score=not available"
+        )
+        return False, previous_value
+
+    z_score = (current_value - mean) / stddev
+
+    print(
+        f"Metric={metric} "
+        f"Mean={mean:.2f} "
+        f"StdDev={stddev:.2f} "
+        f"Z-Score={z_score:.2f}"
+    )
+
+    if z_score >= SPIKE_STDDEV_MULTIPLIER:
         return True, previous_value
 
     return False, previous_value
+
 
 def create_anomaly_event(
     envelope: dict,
@@ -104,11 +141,11 @@ def create_anomaly_event(
             "previous_value": previous_value,
             "current_value": current_value,
             "increase_amount": increase_amount,
-            "threshold": SPIKE_THRESHOLD,
-            "reason": "value increased above previous observation",
+            "reason": "value increased significantly compared to recent history",
             "source_event_id": envelope["event_id"],
         },
     }
+
 
 def main() -> None:
     print("SEZRA spike-detector-service started")
@@ -141,18 +178,6 @@ def main() -> None:
     print(f"Listening on queue: {QUEUE_NAME}")
 
     def handle_message(channel, method, properties, body):
-        """
-        Callback function to handle messages consumed from the RabbitMQ queue.
-
-        This function always acknowledges messages, even if an error occurs during processing,
-        to prevent message re-delivery and ensure proper message queue semantics.
-
-        Args:
-            channel: The channel object.
-            method: Delivery method/frame with delivery_tag.
-            properties: Message properties.
-            body: The message body as bytes.
-        """
         try:
             envelope = json.loads(body.decode("utf-8"))
             event_id = envelope.get("event_id")
@@ -178,18 +203,21 @@ def main() -> None:
                 channel.basic_ack(delivery_tag=method.delivery_tag)
                 return
 
+            current_value = float(current_value)
+
             spike_detected, previous_value = detect_spike(
                 metric=metric,
-                current_value=float(current_value),
+                current_value=current_value,
             )
 
-            if spike_detected:
+            if spike_detected and previous_value is not None:
                 print(f"Spike anomaly detected for metric: {metric}")
+
                 anomaly_event = create_anomaly_event(
-                envelope=envelope,
-                metric=metric,
-                previous_value=previous_value,
-                current_value=float(current_value),
+                    envelope=envelope,
+                    metric=metric,
+                    previous_value=previous_value,
+                    current_value=current_value,
                 )
 
                 channel.basic_publish(
@@ -209,6 +237,7 @@ def main() -> None:
         except json.JSONDecodeError as error:
             print(f"Invalid JSON ignored: {error}")
             channel.basic_ack(delivery_tag=method.delivery_tag)
+
     channel.basic_consume(
         queue=QUEUE_NAME,
         on_message_callback=handle_message,
