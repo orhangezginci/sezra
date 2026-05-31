@@ -9,6 +9,9 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchValue
 from sentence_transformers import SentenceTransformer
 
+CONTEXT_SEARCH_RETRIES = 5
+CONTEXT_SEARCH_RETRY_DELAY_SECONDS = 2
+
 
 def required_env(name: str) -> str:
     value = os.getenv(name)
@@ -62,6 +65,7 @@ def build_anomaly_search_text(anomaly_event: dict) -> str:
     current_value = payload.get("current_value")
     previous_value = payload.get("previous_value")
     drop_amount = payload.get("drop_amount")
+    increase_amount = payload.get("increase_amount")
     reason = payload.get("reason")
 
     parts = []
@@ -75,7 +79,14 @@ def build_anomaly_search_text(anomaly_event: dict) -> str:
         )
 
     if drop_amount is not None:
-        parts.append(f"The detected drop amount is {drop_amount}.")
+        parts.append(
+            f"The detected drop amount is {drop_amount}."
+        )
+
+    if increase_amount is not None:
+        parts.append(
+            f"The detected increase amount is {increase_amount}."
+        )
 
     if reason:
         parts.append(f"Reason: {reason}.")
@@ -137,6 +148,7 @@ def build_summary(
     related_contexts: list[dict],
 ) -> str:
     payload = anomaly_event.get("payload", {})
+
     anomaly_type = payload.get("anomaly_type")
     metric = payload.get("metric", "unknown metric")
     previous_value = payload.get("previous_value")
@@ -156,11 +168,14 @@ def build_summary(
     )
 
     if drop_amount is not None:
-        summary += f" Detected change amount: {drop_amount}."
+        summary += (
+            f" Detected drop amount: {drop_amount}."
+        )
+
     if increase_amount is not None:
         summary += (
-        f" Detected increase amount: {increase_amount}."
-    )
+            f" Detected increase amount: {increase_amount}."
+        )
 
     if related_contexts:
         best_context = related_contexts[0]
@@ -174,12 +189,17 @@ def build_summary(
 
     return summary
 
+
 def create_analysis_event(
     anomaly_event: dict,
     related_contexts: list[dict],
 ) -> dict:
     anomaly_event_id = anomaly_event["event_id"]
-    summary = build_summary(anomaly_event, related_contexts)
+
+    summary = build_summary(
+        anomaly_event=anomaly_event,
+        related_contexts=related_contexts,
+    )
 
     return {
         "event_id": str(uuid4()),
@@ -201,7 +221,9 @@ def main() -> None:
     print("SEZRA analyzer-service started")
 
     print(f"Loading embedding model: {MODEL_NAME}")
+
     embedding_model = SentenceTransformer(MODEL_NAME)
+
     print("Embedding model loaded")
 
     qdrant_client = QdrantClient(
@@ -244,20 +266,45 @@ def main() -> None:
     def handle_message(channel, method, properties, body):
         try:
             anomaly_event = json.loads(body.decode("utf-8"))
+
             event_id = anomaly_event.get("event_id")
 
             if not event_id:
-                print("Invalid anomaly event ignored: missing event_id")
-                channel.basic_ack(delivery_tag=method.delivery_tag)
+                print(
+                    "Invalid anomaly event ignored: "
+                    "missing event_id"
+                )
+
+                channel.basic_ack(
+                    delivery_tag=method.delivery_tag
+                )
+
                 return
 
             print(f"Received anomaly event: {event_id}")
 
-            related_contexts = search_related_contexts(
-                qdrant_client=qdrant_client,
-                embedding_model=embedding_model,
-                anomaly_event=anomaly_event,
-            )
+            related_contexts = []
+
+            for attempt in range(CONTEXT_SEARCH_RETRIES):
+                related_contexts = search_related_contexts(
+                    qdrant_client=qdrant_client,
+                    embedding_model=embedding_model,
+                    anomaly_event=anomaly_event,
+                )
+
+                if related_contexts:
+                    break
+
+                print(
+                    f"No related context found yet. "
+                    f"Retrying context search "
+                    f"({attempt + 1}/"
+                    f"{CONTEXT_SEARCH_RETRIES})..."
+                )
+
+                time.sleep(
+                    CONTEXT_SEARCH_RETRY_DELAY_SECONDS
+                )
 
             print(f"Related contexts: {related_contexts}")
 
@@ -276,13 +323,21 @@ def main() -> None:
                 ),
             )
 
-            print(f"Published analysis event: {analysis_event['event_id']}")
+            print(
+                f"Published analysis event: "
+                f"{analysis_event['event_id']}"
+            )
 
-            channel.basic_ack(delivery_tag=method.delivery_tag)
+            channel.basic_ack(
+                delivery_tag=method.delivery_tag
+            )
 
         except json.JSONDecodeError as error:
             print(f"Invalid JSON ignored: {error}")
-            channel.basic_ack(delivery_tag=method.delivery_tag)
+
+            channel.basic_ack(
+                delivery_tag=method.delivery_tag
+            )
 
     channel.basic_consume(
         queue=QUEUE_NAME,
