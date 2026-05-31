@@ -142,6 +142,7 @@ def build_summary(
     previous_value = payload.get("previous_value")
     current_value = payload.get("current_value")
     drop_amount = payload.get("drop_amount")
+    increase_amount = payload.get("increase_amount")
 
     anomaly_label = (
         f"{anomaly_type} anomaly"
@@ -156,6 +157,10 @@ def build_summary(
 
     if drop_amount is not None:
         summary += f" Detected change amount: {drop_amount}."
+    if increase_amount is not None:
+        summary += (
+        f" Detected increase amount: {increase_amount}."
+    )
 
     if related_contexts:
         best_context = related_contexts[0]
