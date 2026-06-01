@@ -28,6 +28,37 @@ embedding_model = SentenceTransformer(MODEL_NAME)
 def health():
     return {"status": "ok"}
 
+def serialize_event(event: StoredEventEnvelope) -> dict:
+    return {
+        "event_id": event.event_id,
+        "event_type": event.event_type,
+        "source": event.source,
+        "occurred_at": event.occurred_at,
+        "received_at": event.received_at,
+        "correlation_id": event.correlation_id,
+        "causation_id": event.causation_id,
+        "payload": event.payload,
+    }
+    
+@app.get("/analyses/latest")
+def get_latest_analysis():
+    session = SessionLocal()
+
+    try:
+        event = (
+            session.query(StoredEventEnvelope)
+            .filter(StoredEventEnvelope.event_type == "AnalysisGenerated")
+            .order_by(desc(StoredEventEnvelope.received_at))
+            .first()
+        )
+
+        if event is None:
+            raise HTTPException(status_code=404, detail="No analysis found")
+
+        return serialize_event(event)
+
+    finally:
+        session.close()
 
 @app.get("/events")
 def get_events(limit: int = 20):
