@@ -9,8 +9,16 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchValue
 from sentence_transformers import SentenceTransformer
 
+
 CONTEXT_SEARCH_RETRIES = 5
 CONTEXT_SEARCH_RETRY_DELAY_SECONDS = 2
+
+COLLECTION_NAME = "sezra_events"
+MODEL_NAME = "all-MiniLM-L6-v2"
+
+ANOMALY_EXCHANGE = "sezra.stream.anomaly"
+ANALYSIS_EXCHANGE = "sezra.stream.analysis"
+QUEUE_NAME = "sezra.queue.analyzer"
 
 
 def required_env(name: str) -> str:
@@ -25,17 +33,10 @@ def required_env(name: str) -> str:
 QDRANT_HOST = required_env("QDRANT_HOST")
 QDRANT_PORT = int(required_env("QDRANT_PORT"))
 
-COLLECTION_NAME = "sezra_events"
-MODEL_NAME = "all-MiniLM-L6-v2"
-
 RABBITMQ_HOST = required_env("RABBITMQ_HOST")
 RABBITMQ_PORT = int(required_env("RABBITMQ_PORT"))
 RABBITMQ_USER = required_env("RABBITMQ_USER")
 RABBITMQ_PASSWORD = required_env("RABBITMQ_PASSWORD")
-
-ANOMALY_EXCHANGE = "sezra.stream.anomaly"
-ANALYSIS_EXCHANGE = "sezra.stream.analysis"
-QUEUE_NAME = "sezra.queue.analyzer"
 
 
 def connect_to_rabbitmq() -> pika.BlockingConnection:
@@ -79,14 +80,10 @@ def build_anomaly_search_text(anomaly_event: dict) -> str:
         )
 
     if drop_amount is not None:
-        parts.append(
-            f"The detected drop amount is {drop_amount}."
-        )
+        parts.append(f"The detected drop amount is {drop_amount}.")
 
     if increase_amount is not None:
-        parts.append(
-            f"The detected increase amount is {increase_amount}."
-        )
+        parts.append(f"The detected increase amount is {increase_amount}.")
 
     if reason:
         parts.append(f"Reason: {reason}.")
@@ -168,18 +165,13 @@ def build_summary(
     )
 
     if drop_amount is not None:
-        summary += (
-            f" Detected drop amount: {drop_amount}."
-        )
+        summary += f" Detected drop amount: {drop_amount}."
 
     if increase_amount is not None:
-        summary += (
-            f" Detected increase amount: {increase_amount}."
-        )
+        summary += f" Detected increase amount: {increase_amount}."
 
     if related_contexts:
         best_context = related_contexts[0]
-
         summary += (
             " The most relevant contextual event found was: "
             f'"{best_context.get("text")}".'
@@ -188,6 +180,66 @@ def build_summary(
         summary += " No relevant contextual event was found."
 
     return summary
+
+
+def build_human_readable_analysis(
+    anomaly_event: dict,
+    related_contexts: list[dict],
+) -> dict:
+    payload = anomaly_event.get("payload", {})
+
+    anomaly_type = payload.get("anomaly_type", "unknown")
+    metric = payload.get("metric", "unknown metric")
+    previous_value = payload.get("previous_value")
+    current_value = payload.get("current_value")
+    increase_amount = payload.get("increase_amount")
+    drop_amount = payload.get("drop_amount")
+
+    title = f"{anomaly_type.capitalize()} anomaly detected"
+
+    detected_anomaly = (
+        f'Metric "{metric}" changed from '
+        f"{previous_value} to {current_value}."
+    )
+
+    if increase_amount is not None:
+        detected_anomaly += f" Increase amount: {increase_amount}."
+
+    if drop_amount is not None:
+        detected_anomaly += f" Drop amount: {drop_amount}."
+
+    if related_contexts:
+        best_context = related_contexts[0]
+        most_relevant_context = best_context.get("text")
+    else:
+        most_relevant_context = "No relevant contextual signal was found."
+
+    possible_interpretation = (
+        "The related context may help explain the detected anomaly. "
+        "This is a semantic correlation, not a proven causal conclusion."
+    )
+
+    return {
+        "title": title,
+        "detected_anomaly": detected_anomaly,
+        "most_relevant_context": most_relevant_context,
+        "possible_interpretation": possible_interpretation,
+    }
+
+
+def print_human_readable_analysis(human_readable: dict) -> None:
+    print()
+    print("SEZRA Analysis")
+    print()
+    print("Anomaly:")
+    print(human_readable["detected_anomaly"])
+    print()
+    print("Likely context:")
+    print(human_readable["most_relevant_context"])
+    print()
+    print("Interpretation:")
+    print(human_readable["possible_interpretation"])
+    print()
 
 
 def create_analysis_event(
@@ -201,18 +253,23 @@ def create_analysis_event(
         related_contexts=related_contexts,
     )
 
+    human_readable = build_human_readable_analysis(
+        anomaly_event=anomaly_event,
+        related_contexts=related_contexts,
+    )
+
     return {
         "event_id": str(uuid4()),
-        "event_type": "CausalAnalysisResult",
+        "event_type": "AnalysisGenerated",
         "source": "analyzer-service",
         "occurred_at": datetime.now(timezone.utc).isoformat(),
         "correlation_id": anomaly_event_id,
         "causation_id": anomaly_event_id,
         "payload": {
             "summary": summary,
-            "anomaly_event_id": anomaly_event_id,
+            "human_readable": human_readable,
             "related_contexts": related_contexts,
-            "confidence": 0.5,
+            "source_anomaly_event_id": anomaly_event_id,
         },
     }
 
@@ -221,9 +278,7 @@ def main() -> None:
     print("SEZRA analyzer-service started")
 
     print(f"Loading embedding model: {MODEL_NAME}")
-
     embedding_model = SentenceTransformer(MODEL_NAME)
-
     print("Embedding model loaded")
 
     qdrant_client = QdrantClient(
@@ -266,19 +321,11 @@ def main() -> None:
     def handle_message(channel, method, properties, body):
         try:
             anomaly_event = json.loads(body.decode("utf-8"))
-
             event_id = anomaly_event.get("event_id")
 
             if not event_id:
-                print(
-                    "Invalid anomaly event ignored: "
-                    "missing event_id"
-                )
-
-                channel.basic_ack(
-                    delivery_tag=method.delivery_tag
-                )
-
+                print("Invalid anomaly event ignored: missing event_id")
+                channel.basic_ack(delivery_tag=method.delivery_tag)
                 return
 
             print(f"Received anomaly event: {event_id}")
@@ -298,15 +345,19 @@ def main() -> None:
                 print(
                     f"No related context found yet. "
                     f"Retrying context search "
-                    f"({attempt + 1}/"
-                    f"{CONTEXT_SEARCH_RETRIES})..."
+                    f"({attempt + 1}/{CONTEXT_SEARCH_RETRIES})..."
                 )
 
-                time.sleep(
-                    CONTEXT_SEARCH_RETRY_DELAY_SECONDS
-                )
+                time.sleep(CONTEXT_SEARCH_RETRY_DELAY_SECONDS)
 
             print(f"Related contexts: {related_contexts}")
+
+            human_readable = build_human_readable_analysis(
+                anomaly_event=anomaly_event,
+                related_contexts=related_contexts,
+            )
+
+            print_human_readable_analysis(human_readable)
 
             analysis_event = create_analysis_event(
                 anomaly_event=anomaly_event,
@@ -323,21 +374,13 @@ def main() -> None:
                 ),
             )
 
-            print(
-                f"Published analysis event: "
-                f"{analysis_event['event_id']}"
-            )
+            print(f"Published analysis event: {analysis_event['event_id']}")
 
-            channel.basic_ack(
-                delivery_tag=method.delivery_tag
-            )
+            channel.basic_ack(delivery_tag=method.delivery_tag)
 
         except json.JSONDecodeError as error:
             print(f"Invalid JSON ignored: {error}")
-
-            channel.basic_ack(
-                delivery_tag=method.delivery_tag
-            )
+            channel.basic_ack(delivery_tag=method.delivery_tag)
 
     channel.basic_consume(
         queue=QUEUE_NAME,

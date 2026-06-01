@@ -86,12 +86,31 @@ def extract_text(envelope: dict) -> str | None:
     metric = payload.get("metric")
     value = payload.get("value")
     grade_level = payload.get("grade_level")
+    service = payload.get("service")
+    source_type = payload.get("source_type")
+    context_type = payload.get("context_type")
+
+    if source_type == "context" and context_type == "metric":
+        if metric is not None:
+            parts.append(f"Context metric {metric}")
+
+        if service is not None:
+            parts.append(f"for service {service}")
+
+        if value is not None:
+            parts.append(f"has value {value}")
+
+        if parts:
+            return " ".join(parts) + "."
 
     if metric is not None:
         parts.append(f"Metric {metric}")
 
     if grade_level is not None:
         parts.append(f"for grade level {grade_level}")
+
+    if service is not None:
+        parts.append(f"for service {service}")
 
     if value is not None:
         parts.append(f"has value {value}")
@@ -100,8 +119,7 @@ def extract_text(envelope: dict) -> str | None:
         return " ".join(parts) + "."
 
     return json.dumps(payload, sort_keys=True)
-
-
+    
 def main() -> None:
     print("SEZRA embedding-service started")
 
