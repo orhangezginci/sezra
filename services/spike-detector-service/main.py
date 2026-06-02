@@ -12,6 +12,7 @@ metric_history: dict[str, list[float]] = {}
 
 MIN_HISTORY_SIZE = 3
 SPIKE_STDDEV_MULTIPLIER = 2
+MAX_HISTORY_SIZE = 50
 
 RAW_EXCHANGE = "sezra.stream.raw"
 ANOMALY_EXCHANGE = "sezra.stream.anomaly"
@@ -94,6 +95,10 @@ def detect_spike(
     stddev = np.std(history)
 
     history.append(current_value)
+
+    if len(history) > MAX_HISTORY_SIZE:
+        history = history[-MAX_HISTORY_SIZE:]
+
     metric_history[metric] = history
 
     if stddev == 0:
@@ -103,6 +108,7 @@ def detect_spike(
             f"StdDev={stddev:.2f} "
             f"Z-Score=not available"
         )
+
         return False, previous_value
 
     z_score = (current_value - mean) / stddev
@@ -118,8 +124,7 @@ def detect_spike(
         return True, previous_value
 
     return False, previous_value
-
-
+    
 def create_anomaly_event(
     envelope: dict,
     metric: str,
