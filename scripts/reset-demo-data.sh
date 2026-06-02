@@ -7,6 +7,9 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INBOX="$PROJECT_ROOT/data/json-inbox"
 PROCESSED="$PROJECT_ROOT/data/json-processed"
 
+mkdir -p "$INBOX"
+mkdir -p "$PROCESSED"
+
 echo "Cleaning inbox..."
 rm -f "$INBOX"/*.json || true
 
@@ -30,7 +33,14 @@ curl -X PUT "http://localhost:6333/collections/sezra_events" \
       "size": 384,
       "distance": "Cosine"
     }
-  }'
+  }' >/dev/null
+
+echo "Restarting stateful services..."
+
+docker compose restart drop-detector-service >/dev/null 2>&1 || true
+docker compose restart spike-detector-service >/dev/null 2>&1 || true
+docker compose restart embedding-service >/dev/null 2>&1 || true
+docker compose restart analyzer-service >/dev/null 2>&1 || true
 
 echo
 echo "SEZRA demo data reset complete."
