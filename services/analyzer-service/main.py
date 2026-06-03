@@ -20,6 +20,9 @@ ANOMALY_EXCHANGE = "sezra.stream.anomaly"
 ANALYSIS_EXCHANGE = "sezra.stream.analysis"
 QUEUE_NAME = "sezra.queue.analyzer"
 
+ANALYZER_DEAD_LETTER_EXCHANGE = "sezra.stream.dead_letter"
+ANALYZER_DEAD_LETTER_ROUTING_KEY = "analyzer-service.failed"
+
 
 def required_env(name: str) -> str:
     value = os.getenv(name)
@@ -273,7 +276,43 @@ def create_analysis_event(
         },
     }
 
+def publish_dead_letter_event(
+    channel,
+    original_body: bytes,
+    error: Exception,
+    reason: str,
+) -> None:
+    failed_event = {
+        "event_id": str(uuid4()),
+        "event_type": "EventProcessingFailed",
+        "source": "analyzer-service",
+        "occurred_at": datetime.now(timezone.utc).isoformat(),
+        "correlation_id": None,
+        "causation_id": None,
+        "payload": {
+            "failed_service": "analyzer-service",
+            "reason": reason,
+            "error_type": type(error).__name__,
+            "error_message": str(error),
+            "original_body": original_body.decode(
+                "utf-8",
+                errors="replace",
+            ),
+        },
+    }
 
+    channel.basic_publish(
+        exchange=ANALYZER_DEAD_LETTER_EXCHANGE,
+        routing_key=ANALYZER_DEAD_LETTER_ROUTING_KEY,
+        body=json.dumps(failed_event).encode("utf-8"),
+        properties=pika.BasicProperties(
+            content_type="application/json",
+            delivery_mode=2,
+        ),
+    )
+
+    print(f"Published dead-letter event: {failed_event['event_id']}")
+    
 def main() -> None:
     print("SEZRA analyzer-service started")
 
@@ -302,6 +341,12 @@ def main() -> None:
 
     channel.exchange_declare(
         exchange=ANALYSIS_EXCHANGE,
+        exchange_type="fanout",
+        durable=True,
+    )
+
+    channel.exchange_declare(
+        exchange=ANALYZER_DEAD_LETTER_EXCHANGE,
         exchange_type="fanout",
         durable=True,
     )
@@ -378,10 +423,34 @@ def main() -> None:
 
             channel.basic_ack(delivery_tag=method.delivery_tag)
 
+    
         except json.JSONDecodeError as error:
-            print(f"Invalid JSON ignored: {error}")
-            channel.basic_ack(delivery_tag=method.delivery_tag)
+            print(f"Invalid JSON received: {error}")
 
+            publish_dead_letter_event(
+                channel=channel,
+                original_body=body,
+                error=error,
+                reason="Invalid JSON payload",
+            )
+
+            channel.basic_ack(
+                delivery_tag=method.delivery_tag,
+            )
+
+        except Exception as error:
+            print(f"Unexpected analyzer error: {error}")
+
+            publish_dead_letter_event(
+                channel=channel,
+                original_body=body,
+                error=error,
+                reason="Unexpected analyzer processing failure",
+            )
+
+            channel.basic_ack(
+                delivery_tag=method.delivery_tag,
+            )
     channel.basic_consume(
         queue=QUEUE_NAME,
         on_message_callback=handle_message,

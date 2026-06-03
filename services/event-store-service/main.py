@@ -20,6 +20,7 @@ EXCHANGES = [
     "sezra.stream.raw",
     "sezra.stream.anomaly",
     "sezra.stream.analysis",
+    "sezra.stream.dead_letter",
 ]
 
 QUEUE_NAME = "sezra.queue.event_store"
