@@ -62,6 +62,23 @@ def connect_to_rabbitmq() -> pika.BlockingConnection:
             time.sleep(3)
 
 
+def validate_event_envelope(event: dict) -> None:
+    required_fields = [
+        "event_id",
+        "event_type",
+        "source",
+        "occurred_at",
+        "payload",
+    ]
+
+    for field in required_fields:
+        if field not in event:
+            raise ValueError(f"Missing required envelope field: {field}")
+
+    if not isinstance(event["payload"], dict):
+        raise ValueError("Envelope payload must be an object")
+
+
 def build_anomaly_search_text(anomaly_event: dict) -> str:
     payload = anomaly_event.get("payload", {})
 
@@ -276,6 +293,7 @@ def create_analysis_event(
         },
     }
 
+
 def publish_dead_letter_event(
     channel,
     original_body: bytes,
@@ -317,7 +335,9 @@ def publish_dead_letter_event(
         "Published dead-letter event: "
         f"{failed_event['event_id']} "
         f"(class={failure_class})"
-    )   
+    )
+
+
 def main() -> None:
     print("SEZRA analyzer-service started")
 
@@ -371,12 +391,9 @@ def main() -> None:
     def handle_message(channel, method, properties, body):
         try:
             anomaly_event = json.loads(body.decode("utf-8"))
-            event_id = anomaly_event.get("event_id")
+            validate_event_envelope(anomaly_event)
 
-            if not event_id:
-                print("Invalid anomaly event ignored: missing event_id")
-                channel.basic_ack(delivery_tag=method.delivery_tag)
-                return
+            event_id = anomaly_event.get("event_id")
 
             print(f"Received anomaly event: {event_id}")
 
@@ -428,7 +445,6 @@ def main() -> None:
 
             channel.basic_ack(delivery_tag=method.delivery_tag)
 
-    
         except json.JSONDecodeError as error:
             print(f"Invalid JSON received: {error}")
 
@@ -437,6 +453,21 @@ def main() -> None:
                 original_body=body,
                 error=error,
                 reason="Invalid JSON payload",
+                failure_class="permanent",
+            )
+
+            channel.basic_ack(
+                delivery_tag=method.delivery_tag,
+            )
+
+        except ValueError as error:
+            print(f"Invalid SEZRA event envelope: {error}")
+
+            publish_dead_letter_event(
+                channel=channel,
+                original_body=body,
+                error=error,
+                reason="Invalid SEZRA event envelope",
                 failure_class="permanent",
             )
 
@@ -458,6 +489,7 @@ def main() -> None:
             channel.basic_ack(
                 delivery_tag=method.delivery_tag,
             )
+
     channel.basic_consume(
         queue=QUEUE_NAME,
         on_message_callback=handle_message,
