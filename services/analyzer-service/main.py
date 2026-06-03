@@ -281,6 +281,7 @@ def publish_dead_letter_event(
     original_body: bytes,
     error: Exception,
     reason: str,
+    failure_class: str,
 ) -> None:
     failed_event = {
         "event_id": str(uuid4()),
@@ -291,6 +292,7 @@ def publish_dead_letter_event(
         "causation_id": None,
         "payload": {
             "failed_service": "analyzer-service",
+            "failure_class": failure_class,
             "reason": reason,
             "error_type": type(error).__name__,
             "error_message": str(error),
@@ -311,8 +313,11 @@ def publish_dead_letter_event(
         ),
     )
 
-    print(f"Published dead-letter event: {failed_event['event_id']}")
-    
+    print(
+        "Published dead-letter event: "
+        f"{failed_event['event_id']} "
+        f"(class={failure_class})"
+    )   
 def main() -> None:
     print("SEZRA analyzer-service started")
 
@@ -432,6 +437,7 @@ def main() -> None:
                 original_body=body,
                 error=error,
                 reason="Invalid JSON payload",
+                failure_class="permanent",
             )
 
             channel.basic_ack(
@@ -446,6 +452,7 @@ def main() -> None:
                 original_body=body,
                 error=error,
                 reason="Unexpected analyzer processing failure",
+                failure_class="transient",
             )
 
             channel.basic_ack(
