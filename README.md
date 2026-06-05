@@ -98,30 +98,87 @@ publish events
 That is the whole contract.
 
 ```mermaid
-flowchart LR
-    A[Adapters] --> R[(RabbitMQ Event Streams)]
+flowchart TD
+    %% === STYLES ===
+    classDef external fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1
+    classDef bus fill:#e8f5e9,stroke:#2e7d32,stroke-width:3px,color:#1b5e20
+    classDef detector fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#4a148c
+    classDef semantic fill:#fff3e0,stroke:#ef6c00,stroke-width:2px,color:#e65100
+    classDef storage fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#880e4f
+    classDef core fill:#e0f2f1,stroke:#00796b,stroke-width:2px,color:#004d40
+    classDef api fill:#f1f8e9,stroke:#689f38,stroke-width:2px,color:#33691e
 
-    R --> D1[Spike Detector]
-    R --> D2[Drop Detector]
-    R --> E[Embedding Service]
+    %% === EXTERNAL INPUTS ===
+    subgraph External["🌍 External Sources"]
+        ADAPTER[JSON File Adapter<br/>+ Future Adapters]
+        EXTERNAL[Metrics / Logs / CI-CD<br/>Infrastructure Events]
+    end
 
-    D1 --> R
-    D2 --> R
+    %% === EVENT BUS ===
+    RABBIT[(🐰 RabbitMQ<br/>Event Fabric)]
 
-    E --> Q[(Qdrant Semantic Store)]
+    %% === DETECTORS ===
+    subgraph Detectors["🔍 Anomaly Detectors"]
+        SPIKE[Spike Detector Service]
+        DROP[Drop Detector Service]
+    end
 
-    R --> AN[Analyzer Service]
-    Q --> AN
+    %% === SEMANTIC LAYER ===
+    subgraph Semantic["🧠 Semantic Layer"]
+        EMBED[Embedding Service]
+        QDRANT[(Qdrant<br/>Vector Store)]
+    end
 
-    AN --> R
+    %% === CORE PROCESSING ===
+    ANALYZER[Analyzer Service<br/>Semantic Event Reasoning]
 
-    R --> ES[Event Store Service]
-    ES --> PG[(PostgreSQL Event Store)]
+    %% === STORAGE ===
+    subgraph Storage["💾 Storage"]
+        EVENTSTORE[Event Store Service]
+        PG[(PostgreSQL<br/>Event Store)]
+    end
 
-    API[API Service] --> PG
-    API --> Q
+    %% === OUTPUT ===
+    API[API Service<br/>REST + Analyses]
 
-    Studio[SEZRA Studio / External Tools] --> API
+    %% === FUTURE ===
+    STUDIO[SEZRA Studio<br/>External Tools]
+
+    %% === DATA FLOW ===
+    EXTERNAL --> ADAPTER
+    ADAPTER --> RABBIT
+
+    RABBIT --> SPIKE
+    RABBIT --> DROP
+    RABBIT --> EMBED
+
+    SPIKE --> RABBIT
+    DROP --> RABBIT
+
+    EMBED --> QDRANT
+
+    RABBIT --> ANALYZER
+    QDRANT --> ANALYZER
+
+    ANALYZER --> RABBIT
+
+    RABBIT --> EVENTSTORE
+    EVENTSTORE --> PG
+
+    API --> PG
+    API --> QDRANT
+    API --> RABBIT
+
+    STUDIO --> API
+
+    %% === APPLY STYLES ===
+    class External external
+    class RABBIT bus
+    class SPIKE,DROP detector
+    class Semantic,EMBED,QDRANT semantic
+    class Storage,PG,EVENTSTORE storage
+    class ANALYZER core
+    class API api
 ```
 
 SEZRA services are independently deployable and replaceable.
