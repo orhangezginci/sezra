@@ -1,364 +1,244 @@
 # SEZRA
 
-SEZRA is a hyper-decoupled event-driven causal analysis platform.
+**Operational events are meaningless in isolation. SEZRA turns them into context-aware reasoning.**
 
-The goal of SEZRA is to correlate anomalies in structured telemetry with semantically related contextual events from completely different data sources.
+SEZRA is a semantic event reasoning engine built for modern distributed systems.
 
-SEZRA combines:
+Instead of only detecting anomalies, SEZRA correlates operational events with surrounding contextual signals to generate human-readable analysis and semantic operational insight.
 
-- Event-driven architecture
-- Semantic vector search
-- Context retrieval
-- Independent anomaly detectors
-- Fully asynchronous processing
+Feed SEZRA with metrics, logs, context events, CI/CD events, infrastructure signals, or custom business events — and let semantic reasoning emerge across your event streams.
 
 ---
 
-# Architecture Overview
-
-```mermaid
-flowchart TD
-
-    USER[User / Client]
-
-    A[json-file-adapter]
-    RAW[RabbitMQ: sezra.stream.raw]
-
-    DROP[drop-detector-service]
-    SPIKE[spike-detector-service]
-
-    ANOMALY[RabbitMQ: sezra.stream.anomaly]
-
-    ANALYZER[analyzer-service]
-    EMBED[embedding-service]
-    STORE[event-store-service]
-
-    API[api-service]
-
-    QDRANT[(Qdrant Vector Store)]
-    POSTGRES[(PostgreSQL Event Store)]
-
-    RESULT[CausalAnalysisResult Event]
-
-    USER --> API
-
-    API --> POSTGRES
-    API --> QDRANT
-
-    A --> RAW
-
-    RAW --> DROP
-    RAW --> SPIKE
-    RAW --> EMBED
-    RAW --> STORE
-
-    DROP --> ANOMALY
-    SPIKE --> ANOMALY
-
-    ANOMALY --> ANALYZER
-    ANOMALY --> STORE
-
-    ANALYZER --> QDRANT
-    ANALYZER --> RESULT
-
-    RESULT --> STORE
-
-    EMBED --> QDRANT
-
-    STORE --> POSTGRES
-```
-
-Core technologies:
-
-- RabbitMQ
-- Qdrant
-- PostgreSQL
-- SentenceTransformers
-- Docker Compose
-- Python microservices
-
----
-
-# Core Principles
-
-- Hyper-decoupled architecture
-- Event-driven communication
-- Domain agnostic design
-- Independent detector services
-- Semantic causal retrieval
-- Context-source agnostic ingestion
-- Fully asynchronous pipeline
-
----
-
-# Services
-
-## json-file-adapter
-
-Reads JSON files and publishes normalized events into the raw event stream.
-
-## drop-detector-service
-
-Detects downward metric anomalies.
-
-Example:
-
-```text
-78 → 62
-```
-
-## spike-detector-service
-
-Detects upward spike anomalies.
-
-Example:
-
-```text
-180 → 420
-```
-
-## embedding-service
-
-Generates vector embeddings and stores them in Qdrant.
-
-## analyzer-service
-
-Semantically retrieves contextual events related to anomalies and creates causal analysis results.
-
-## event-store-service
-
-Stores event envelopes in PostgreSQL.
-
-Currently persisted event types include:
-
-- raw observation/context events
-- anomaly events
-- causal analysis result events
-
-## api-service
-
-Provides API access to:
-
-- stored events
-- analysis results
-- semantic search data
-
-The API service is intentionally separated from the event pipeline and acts purely as a read/query interface.
-
----
-
-# Environment Configuration
-
-Create a `.env` file:
-
-```env
-RABBITMQ_HOST=rabbitmq
-RABBITMQ_PORT=5672
-RABBITMQ_USER=sezra
-RABBITMQ_PASSWORD=sezra
-
-POSTGRES_HOST=postgres
-POSTGRES_PORT=5432
-POSTGRES_USER=sezra
-POSTGRES_PASSWORD=sezra
-POSTGRES_DB=sezra
-
-QDRANT_HOST=qdrant
-QDRANT_PORT=6333
-```
-
-For public repositories, use `.env.example` as the template and keep the real `.env` file untracked.
-
----
-
-# Start SEZRA
-
-School-grade demo profile:
+# Clone. Run. Experience SEZRA.
 
 ```bash
-docker compose --profile drop-detectors up --build
+git clone https://github.com/orhangezginci/sezra.git
+cd sezra
+docker compose up -d
 ```
 
-DevOps spike demo profile:
+Run the demo:
 
 ```bash
-docker compose --profile spike-detectors up --build
+./scripts/demo-metric-context.sh
 ```
 
----
-
-# Reset Demo State
-
-Before running demos:
+Fetch the latest generated analysis:
 
 ```bash
-./scripts/reset-demo-data.sh
+curl http://localhost:8000/analyses/latest
 ```
 
-This clears:
-
-- PostgreSQL event store
-- Qdrant collection
-- Processed demo files
-
----
-
-# Demo 1 — School Grades
-
-Educational telemetry correlated with contextual email communication.
-
-## Context Event
+Example output:
 
 ```text
-"Starting next Monday, school begins at 7:30 AM instead of 8:00 AM."
-```
-
-## Observation Events
-
-Baseline:
-
-```text
-math_test_average = 78
-```
+SEZRA Analysis
 
 Anomaly:
+API latency spiked from 178ms to 420ms.
 
-```text
-math_test_average = 62
-```
+Likely context:
+CPU usage for checkout-api was 94%.
 
-## Run Demo
-
-```bash
-./scripts/demo-school.sh
-```
-
-## Expected Result
-
-```text
-SEZRA detected an anomaly for metric "math_test_average".
-The value changed from 78.0 to 62.0.
-The most relevant contextual event found was:
-"Starting next Monday, school begins at 7:30 AM instead of 8:00 AM."
+Interpretation:
+The latency spike may be related to high CPU usage on the same service.
 ```
 
 ---
 
-# Demo 2 — DevOps / Jenkins Deployment
+# What Is SEZRA?
 
-Infrastructure telemetry correlated with deployment events.
+SEZRA is not just another anomaly detector.
 
-## Context Event
+SEZRA is built around the idea that operational events gain meaning through semantic context.
 
-```text
-"Jenkins deployed checkout-api version 1.12.0 with new request logging middleware."
-```
+Instead of treating events as isolated signals, SEZRA correlates anomalies with surrounding operational context to generate higher-level operational understanding.
 
-## Observation Events
+SEZRA is designed to work across:
 
-Baseline:
+* metrics
+* logs
+* infrastructure signals
+* CI/CD events
+* operational telemetry
+* custom business events
+* semantic context streams
 
-```text
-api_latency_ms = 180
-```
+SEZRA can run:
 
-Spike anomaly:
-
-```text
-api_latency_ms = 420
-```
-
-## Run Demo
-
-```bash
-./scripts/demo-devops.sh
-```
-
-## Expected Result
-
-```text
-SEZRA detected an anomaly for metric "api_latency_ms".
-The value changed from 180.0 to 420.0.
-The most relevant contextual event found was:
-"Jenkins deployed checkout-api version 1.12.0 with new request logging middleware."
-```
+* locally with Docker Compose
+* fully headless
+* inside enterprise environments
+* inside CI/CD pipelines
+* behind custom APIs
+* inside Kubernetes platforms
+* with Bash scripts
+* with Python automation
+* through future SEZRA Studio workflows
 
 ---
 
-# Why SEZRA?
+# Architecture
 
-Traditional monitoring systems detect anomalies.
+SEZRA is intentionally simple.
 
-SEZRA attempts to explain them.
+No shared runtime library.
+No hidden service coupling.
+No mandatory SDK.
 
-Instead of only detecting that something changed, SEZRA searches semantically related contextual information across independent event streams.
+Every service does one thing:
 
-The platform is intentionally domain agnostic:
+```text
+consume events
+process events
+publish events
+```
 
-- education
-- DevOps
-- IoT
-- finance
-- manufacturing
-- healthcare
-- CRM systems
-- support systems
-- external APIs
+That is the whole contract.
 
-All domains use the same architecture and pipeline.
+```mermaid
+flowchart LR
+    A[Adapters] --> R[(RabbitMQ Event Streams)]
+
+    R --> D1[Spike Detector]
+    R --> D2[Drop Detector]
+    R --> E[Embedding Service]
+
+    D1 --> R
+    D2 --> R
+
+    E --> Q[(Qdrant Semantic Store)]
+
+    R --> AN[Analyzer Service]
+    Q --> AN
+
+    AN --> R
+
+    R --> ES[Event Store Service]
+    ES --> PG[(PostgreSQL Event Store)]
+
+    API[API Service] --> PG
+    API --> Q
+
+    Studio[SEZRA Studio / External Tools] --> API
+```
+
+SEZRA services are independently deployable and replaceable.
+
+A detector can be written in Python.
+An adapter can be written in Go.
+An enricher can be written in Rust.
+A workflow can be controlled by Bash, Jenkins, an enterprise platform, or the future SEZRA Studio.
+
+As long as a component speaks SEZRA events, it belongs in the system.
 
 ---
 
-# Current MVP State
+# Current MVP Features
 
-The current MVP demonstrates:
-
-- Event-driven microservice architecture
-- Independent detector services
-- Semantic vector retrieval
-- Context correlation
-- Human-readable causal summaries
-- Multiple domain scenarios
-- Repeatable demo execution
-- Pluggable detector profiles
+* Semantic anomaly analysis
+* Context-aware event correlation
+* Human-readable operational reasoning
+* RabbitMQ event fabric
+* PostgreSQL event store
+* Qdrant semantic vector search
+* REST API
+* Dead-letter event persistence
+* Failure classification
+* Envelope validation
+* Runtime health checks
+* Docker Compose deployment
+* Headless operation
+* Hyper-decoupled services
 
 ---
 
-# Future Direction
+# Example Use Cases
 
-Planned future improvements:
+* Correlate application latency spikes with infrastructure signals
+* Enrich operational telemetry with semantic context
+* Analyze CI/CD failures
+* Process business events semantically
+* Run headless operational reasoning pipelines
+* Build enterprise operational intelligence workflows
+* Integrate semantic reasoning into existing architectures
 
-- Statistical anomaly detection
-- Rolling baselines
-- Z-score detectors
-- Time-window analysis
-- Multiple related contexts
-- Confidence scoring
-- Streaming ingestion adapters
-- Jira integration
-- Jenkins integration
-- CRM integrations
-- LLM-assisted causal summaries
-- Real-time dashboards
+---
+
+# SEZRA Studio
+
+SEZRA Studio will become the official visual reference implementation for SEZRA.
+
+Studio is not the engine itself.
+
+SEZRA Studio is the visual manifestation of the SEZRA engine philosophy:
+
+* event-driven
+* hyper-decoupled
+* workflow-oriented
+* semantic-first
+* infrastructure-agnostic
+
+SEZRA Studio will allow users to:
+
+* build pipelines visually
+* attach adapters and detectors
+* configure semantic workflows
+* inspect event flows
+* analyze reasoning chains
+* manage context sources
+* orchestrate operational intelligence visually
+
+The SEZRA engine itself remains fully usable without Studio.
+
+---
+
+# Roadmap
+
+Near-term goals:
+
+* Statistical baseline detectors
+* Additional adapters
+* Additional context enrichers
+* Better semantic reasoning
+* Improved API endpoints
+* Public demo environment
+* Initial SEZRA Studio foundation
+
+Long-term vision:
+
+* Visual pipeline orchestration
+* Detector/adapter marketplace
+* Plugin ecosystem
+* Distributed deployment support
+* Advanced reasoning services
+* Enterprise integrations
+* Workflow automation ecosystem
+
+---
+
+# Development Status
+
+SEZRA is currently in active MVP-stage development.
+
+The current focus is:
+
+* engine stability
+* semantic reasoning quality
+* operational hardening
+* architecture clarity
+* public usability
+* SEZRA Studio foundations
 
 ---
 
 # Philosophy
 
-SEZRA is intentionally designed around:
+SEZRA is designed around a simple idea:
 
-```text
-small services
-simple responsibilities
-event-driven communication
-minimal coupling
-maximum replaceability
-```
+Operational systems already produce enormous amounts of events.
 
-The architecture prioritizes:
+The missing piece is semantic understanding.
 
-- scalability
-- replaceability
-- observability
-- independent evolution
-- domain flexibility
+SEZRA exists to transform isolated operational signals into contextual operational reasoning.
