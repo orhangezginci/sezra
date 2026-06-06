@@ -1,55 +1,80 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INBOX="$PROJECT_ROOT/data/json-inbox"
 
-mkdir -p "$INBOX"
-cd "$PROJECT_ROOT"
+QUIET=false
 
-publish_json_file() {
-  local filename="$1"
-  local content="$2"
+if [ "${1:-}" = "--quiet" ]; then
+  QUIET=true
+fi
 
-  echo "$content" > "$INBOX/$filename"
-
-  docker compose up --build json-file-adapter
+log() {
+  if [ "$QUIET" = false ]; then
+    echo "$1"
+  fi
 }
 
-echo "Creating CPU usage metric context..."
+mkdir -p "$INBOX"
 
-publish_json_file "cpu-usage-context.json" '{
+log "Creating CPU usage metric context..."
+
+cat > "$INBOX/cpu-usage-context.json" <<EOF
+{
   "source_type": "context",
   "context_type": "metric",
   "metric": "cpu_usage_percent",
   "service": "checkout-api",
   "value": 94
-}'
+}
+EOF
 
-echo "Creating API latency observations..."
+log "Creating API latency observations..."
 
-values=(180 185 178 420)
+cat > "$INBOX/api-latency-baseline-1.json" <<EOF
+{
+  "source_type": "observation",
+  "metric": "api_latency_ms",
+  "service": "checkout-api",
+  "value": 178
+}
+EOF
 
-for index in "${!values[@]}"; do
-  value="${values[$index]}"
+cat > "$INBOX/api-latency-baseline-2.json" <<EOF
+{
+  "source_type": "observation",
+  "metric": "api_latency_ms",
+  "service": "checkout-api",
+  "value": 181
+}
+EOF
 
-  if [ "$value" -eq 420 ]; then
-    filename="api-latency-spike.json"
-  else
-    filename="api-latency-baseline-$((index + 1)).json"
-  fi
+cat > "$INBOX/api-latency-baseline-3.json" <<EOF
+{
+  "source_type": "observation",
+  "metric": "api_latency_ms",
+  "service": "checkout-api",
+  "value": 184
+}
+EOF
 
-  publish_json_file "$filename" "{
-  \"source_type\": \"observation\",
-  \"metric\": \"api_latency_ms\",
-  \"service\": \"checkout-api\",
-  \"value\": $value
-}"
-done
+cat > "$INBOX/api-latency-spike.json" <<EOF
+{
+  "source_type": "observation",
+  "metric": "api_latency_ms",
+  "service": "checkout-api",
+  "value": 420
+}
+EOF
 
-echo "Metric-to-metric demo events published."
-echo "Check logs with:"
-echo "docker compose logs --tail=80 spike-detector-service"
-echo "docker compose logs --tail=80 analyzer-service"
-echo "docker compose logs --tail=80 event-store-service"
+log "Publishing demo events..."
+
+if [ "$QUIET" = true ]; then
+  docker compose up --no-build --force-recreate json-file-adapter >/dev/null 2>&1
+else
+  docker compose up --no-build --force-recreate json-file-adapter
+fi
+
+log "Metric-to-metric demo events published."
