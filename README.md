@@ -11,7 +11,7 @@ Feed SEZRA with metrics, logs, context events, CI/CD events, infrastructure sign
 ---
 
 # Clone. Run. Experience SEZRA.
-
+[![SEZRA Demo](assets/demo/sezra-demo-preview.png)](assets/demo/sezra-demo.mp4)
 ```bash
 git clone https://github.com/orhangezginci/sezra.git
 cd sezra
