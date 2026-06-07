@@ -2,6 +2,20 @@
 
 set -e
 
+SKIP_RESET=false
+SKIP_RUNTIME_CHECK=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --no-reset)
+      SKIP_RESET=true
+      ;;
+    --no-runtime-check)
+      SKIP_RUNTIME_CHECK=true
+      ;;
+  esac
+done
+
 REQUIRED_SERVICES=(
   "sezra-rabbitmq"
   "sezra-postgres"
@@ -13,21 +27,26 @@ REQUIRED_SERVICES=(
   "sezra-spike-detector-service"
 )
 
-echo "Checking SEZRA runtime..."
+if [ "$SKIP_RUNTIME_CHECK" = false ]; then
+  echo "Checking SEZRA runtime..."
 
-for service in "${REQUIRED_SERVICES[@]}"; do
-  if ! docker ps --format '{{.Names}}' | grep -q "^${service}$"; then
-    echo "Runtime not ready. Starting SEZRA services..."
-    ./scripts/init-demo-runtime.sh
-    break
-  fi
-done
+  for service in "${REQUIRED_SERVICES[@]}"; do
+    if ! docker ps --format '{{.Names}}' | grep -q "^${service}$"; then
+      echo "Runtime not ready. Starting SEZRA services..."
+      ./scripts/init-demo-runtime.sh
+      break
+    fi
+  done
+fi
 
-echo "Resetting demo data..."
-./scripts/reset-demo-data.sh >/dev/null 2>&1
+if [ "$SKIP_RESET" = false ]; then
+  echo "Resetting demo data..."
+  ./scripts/reset-demo-data.sh >/dev/null 2>&1
+fi
 
 echo "Ensuring spike detector is running..."
 docker compose up -d spike-detector-service >/dev/null 2>&1
+
 echo "Running metric-to-metric demo scenario..."
 ./scripts/demo-metric-context.sh --quiet
 
@@ -47,5 +66,6 @@ for attempt in {1..10}; do
   sleep 1
 done
 
+echo
 echo "No analysis generated."
 exit 1
