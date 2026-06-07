@@ -11,7 +11,8 @@ Feed SEZRA with metrics, logs, context events, CI/CD events, infrastructure sign
 ---
 
 # Clone. Run. Experience SEZRA.
-https://github.com/user-attachments/assets/8d55fd11-5d4b-428d-b9c3-41e1d5e911a8
+
+![SEZRA Demo](https://github.com/user-attachments/assets/8d55fd11-5d4b-428d-b9c3-41e1d5e911a8)
 
 ```bash
 git clone https://github.com/orhangezginci/sezra.git
@@ -31,7 +32,7 @@ Fetch the latest generated analysis:
 curl http://localhost:8000/analyses/latest
 ```
 
-Example output:
+**Example output:**
 
 ```text
 SEZRA Analysis
@@ -52,57 +53,34 @@ The latency spike may be related to high CPU usage on the same service.
 
 SEZRA is not just another anomaly detector.
 
-SEZRA is built around the idea that operational events gain meaning through semantic context.
+It is built around the idea that operational events gain meaning through **semantic context**.
 
 Instead of treating events as isolated signals, SEZRA correlates anomalies with surrounding operational context to generate higher-level operational understanding.
 
-SEZRA is designed to work across:
+SEZRA works across:
+- Metrics
+- Logs
+- Infrastructure signals
+- CI/CD events
+- Operational telemetry
+- Custom business events
+- Semantic context streams
 
-* metrics
-* logs
-* infrastructure signals
-* CI/CD events
-* operational telemetry
-* custom business events
-* semantic context streams
-
-SEZRA can run:
-
-* locally with Docker Compose
-* fully headless
-* inside enterprise environments
-* inside CI/CD pipelines
-* behind custom APIs
-* inside Kubernetes platforms
-* with Bash scripts
-* with Python automation
-* through future SEZRA Studio workflows
+It runs locally with Docker Compose, fully headless, in Kubernetes, inside CI/CD pipelines, or as part of larger platforms.
 
 ---
 
 # Architecture
 
-SEZRA is intentionally simple.
+SEZRA is intentionally simple and **hyper-decoupled**.
 
-No shared runtime library.
-No hidden service coupling.
-No mandatory SDK.
+**No shared runtime library. No hidden coupling. No mandatory SDK.**
 
-Every service does one thing:
+Every service follows the same contract:
 
 ```text
-consume events
-process events
-publish events
+consume events → process events → publish events
 ```
-
-That is the whole contract.
-
-**✅ Fixed Mermaid Diagram**
-
-Here is the **clean, corrected, and optimized version** you should use. The previous version had several syntax issues (broken code blocks, class definitions split incorrectly, missing newlines, etc.), which caused it not to render properly on GitHub.
-
-### Final Fixed & Improved Mermaid Code
 
 ```mermaid
 flowchart TD
@@ -188,132 +166,65 @@ flowchart TD
     class API api
 ```
 
-### How to Update
-
-1. Open `README.md`
-2. Find the current mermaid block under the **Architecture** section
-3. **Replace the entire block** with the code above
-4. Save and push
-
-This version is clean, properly structured, and tested for GitHub rendering. It should now display beautifully with colors.
-
-Would you like me to also provide a **simpler version** (without emojis) or any label tweaks?
-
-SEZRA services are independently deployable and replaceable.
-
-A detector can be written in Python.
-An adapter can be written in Go.
-An enricher can be written in Rust.
-A workflow can be controlled by Bash, Jenkins, an enterprise platform, or the future SEZRA Studio.
-
-As long as a component speaks SEZRA events, it belongs in the system.
+SEZRA services are independently deployable and replaceable. A detector can be written in Python, an adapter in Go, an enricher in Rust — as long as they speak SEZRA events, they belong in the system.
 
 ---
 
 # Current MVP Features
 
-* Semantic anomaly analysis
-* Context-aware event correlation
-* Human-readable operational reasoning
-* RabbitMQ event fabric
-* PostgreSQL event store
-* Qdrant semantic vector search
-* REST API
-* Dead-letter event persistence
-* Failure classification
-* Envelope validation
-* Runtime health checks
-* Docker Compose deployment
-* Headless operation
-* Hyper-decoupled services
+- Semantic anomaly analysis
+- Context-aware event correlation
+- Human-readable operational reasoning
+- RabbitMQ event fabric with proper envelopes
+- PostgreSQL event store
+- Qdrant semantic vector search
+- REST API
+- Dead-letter event persistence
+- Failure classification
+- Envelope validation
+- Runtime health checks
+- Docker Compose deployment
+- Hyper-decoupled services
 
 ---
 
 # Example Use Cases
 
-* Correlate application latency spikes with infrastructure signals
-* Enrich operational telemetry with semantic context
-* Analyze CI/CD failures
-* Process business events semantically
-* Run headless operational reasoning pipelines
-* Build enterprise operational intelligence workflows
-* Integrate semantic reasoning into existing architectures
+- Correlate application latency spikes with infrastructure signals
+- Enrich operational telemetry with semantic context
+- Analyze CI/CD failures
+- Process business events semantically
+- Run headless operational reasoning pipelines
 
 ---
 
 # SEZRA Studio
 
-SEZRA Studio will become the official visual reference implementation for SEZRA.
+SEZRA Studio will be the official visual interface for the SEZRA engine — a visual pipeline builder that follows the same hyper-decoupled and semantic-first philosophy.
 
-Studio is not the engine itself.
-
-SEZRA Studio is the visual manifestation of the SEZRA engine philosophy:
-
-* event-driven
-* hyper-decoupled
-* workflow-oriented
-* semantic-first
-* infrastructure-agnostic
-
-SEZRA Studio will allow users to:
-
-* build pipelines visually
-* attach adapters and detectors
-* configure semantic workflows
-* inspect event flows
-* analyze reasoning chains
-* manage context sources
-* orchestrate operational intelligence visually
-
-The SEZRA engine itself remains fully usable without Studio.
+The engine itself remains fully usable without Studio.
 
 ---
 
 # Roadmap
 
-Near-term goals:
+**Near-term:**
+- Statistical baseline detectors
+- Additional adapters & enrichers
+- Improved semantic reasoning
+- Public demo environment
 
-* Statistical baseline detectors
-* Additional adapters
-* Additional context enrichers
-* Better semantic reasoning
-* Improved API endpoints
-* Public demo environment
-* Initial SEZRA Studio foundation
-
-Long-term vision:
-
-* Visual pipeline orchestration
-* Detector/adapter marketplace
-* Plugin ecosystem
-* Distributed deployment support
-* Advanced reasoning services
-* Enterprise integrations
-* Workflow automation ecosystem
-
----
-
-# Development Status
-
-SEZRA is currently in active MVP-stage development.
-
-The current focus is:
-
-* engine stability
-* semantic reasoning quality
-* operational hardening
-* architecture clarity
-* public usability
-* SEZRA Studio foundations
+**Long-term:**
+- Visual pipeline orchestration (Studio)
+- Plugin ecosystem
+- Advanced reasoning services
+- Enterprise integrations
 
 ---
 
 # Philosophy
 
-SEZRA is designed around a simple idea:
+Operational systems already produce enormous amounts of events.  
+The missing piece is **semantic understanding**.
 
-Operational systems already produce enormous amounts of events.
-
-The missing piece is semantic understanding.
-
-SEZRA exists to transform isolated operational signals into contextual operational reasoning.
+SEZRA exists to transform isolated operational signals into contextual, human-understandable operational reasoning.
