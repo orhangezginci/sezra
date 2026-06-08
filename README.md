@@ -31,9 +31,7 @@ Fetch the latest generated analysis:
 ```bash
 curl http://localhost:8000/analyses/latest
 ```
-
 **Example output:**
-
 ```text
 SEZRA Analysis
 
