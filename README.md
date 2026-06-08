@@ -12,7 +12,7 @@ Feed SEZRA with metrics, logs, context events, CI/CD events, infrastructure sign
 
 # Clone. Run. Experience SEZRA.
 
-![SEZRA Demo](https://github.com/user-attachments/assets/8d55fd11-5d4b-428d-b9c3-41e1d5e911a8)
+https://github.com/user-attachments/assets/e697617a-ac33-48a5-bc0b-bd4c4ee9cde9
 
 ```bash
 git clone https://github.com/orhangezginci/sezra.git
@@ -31,7 +31,9 @@ Fetch the latest generated analysis:
 ```bash
 curl http://localhost:8000/analyses/latest
 ```
+
 **Example output:**
+
 ```text
 SEZRA Analysis
 
@@ -56,13 +58,14 @@ It is built around the idea that operational events gain meaning through **seman
 Instead of treating events as isolated signals, SEZRA correlates anomalies with surrounding operational context to generate higher-level operational understanding.
 
 SEZRA works across:
-- Metrics
-- Logs
-- Infrastructure signals
-- CI/CD events
-- Operational telemetry
-- Custom business events
-- Semantic context streams
+
+* Metrics
+* Logs
+* Infrastructure signals
+* CI/CD events
+* Operational telemetry
+* Custom business events
+* Semantic context streams
 
 It runs locally with Docker Compose, fully headless, in Kubernetes, inside CI/CD pipelines, or as part of larger platforms.
 
@@ -82,79 +85,113 @@ consume events → process events → publish events
 
 ```mermaid
 flowchart TD
-    %% === STYLES ===
-    classDef external fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1
-    classDef bus fill:#e8f5e9,stroke:#2e7d32,stroke-width:3px,color:#1b5e20
-    classDef detector fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#4a148c
-    classDef semantic fill:#fff3e0,stroke:#ef6c00,stroke-width:2px,color:#e65100
-    classDef storage fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#880e4f
-    classDef core fill:#e0f2f1,stroke:#00796b,stroke-width:2px,color:#004d40
-    classDef api fill:#f1f8e9,stroke:#689f38,stroke-width:2px,color:#33691e
 
-    %% === EXTERNAL INPUTS ===
+    %% =========================
+    %% STYLES
+    %% =========================
+    classDef external fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#0f172a
+    classDef bus fill:#dcfce7,stroke:#16a34a,stroke-width:3px,color:#052e16
+    classDef detector fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#3b0764
+    classDef semantic fill:#ffedd5,stroke:#ea580c,stroke-width:2px,color:#431407
+    classDef storage fill:#fce7f3,stroke:#db2777,stroke-width:2px,color:#500724
+    classDef core fill:#ccfbf1,stroke:#0f766e,stroke-width:2px,color:#042f2e
+    classDef api fill:#ecfccb,stroke:#65a30d,stroke-width:2px,color:#1a2e05
+    classDef legend fill:#f8fafc,stroke:#64748b,stroke-width:1px,color:#0f172a
+
+    %% =========================
+    %% EXTERNAL INPUTS
+    %% =========================
     subgraph External["🌍 External Sources"]
-        ADAPTER[JSON File Adapter<br/>+ Future Adapters]
-        EXTERNAL[Metrics / Logs / CI-CD<br/>Infrastructure Events]
+        ADAPTER["JSON File Adapter<br/>+ Future Adapters"]
+        EXTERNAL["Metrics / Logs / CI-CD<br/>Infra Events"]
     end
 
-    %% === EVENT BUS ===
-    RABBIT[(🐰 RabbitMQ<br/>Event Fabric)]
+    %% =========================
+    %% EVENT BUS
+    %% =========================
+    RABBIT["🐰 RabbitMQ<br/>Event Fabric"]
 
-    %% === DETECTORS ===
+    %% =========================
+    %% DETECTORS
+    %% =========================
     subgraph Detectors["🔍 Anomaly Detectors"]
-        SPIKE[Spike Detector Service]
-        DROP[Drop Detector Service]
+        SPIKE["Spike Detector"]
+        DROP["Drop Detector"]
     end
 
-    %% === SEMANTIC LAYER ===
+    %% =========================
+    %% SEMANTIC LAYER
+    %% =========================
     subgraph Semantic["🧠 Semantic Layer"]
-        EMBED[Embedding Service]
-        QDRANT[(Qdrant<br/>Vector Store)]
+        EMBED["Embedding Service"]
+        QDRANT["Qdrant<br/>Vector Store"]
     end
 
-    %% === CORE PROCESSING ===
-    ANALYZER[Analyzer Service<br/>Semantic Causal Reasoning]
+    %% =========================
+    %% CORE PROCESSING
+    %% =========================
+    ANALYZER["Analyzer Service<br/>Semantic Reasoning"]
 
-    %% === STORAGE ===
+    %% =========================
+    %% STORAGE
+    %% =========================
     subgraph Storage["💾 Storage"]
-        EVENTSTORE[Event Store Service]
-        PG[(PostgreSQL<br/>Event Store)]
+        EVENTSTORE["Event Store"]
+        PG["PostgreSQL<br/>Event Store"]
     end
 
-    %% === OUTPUT ===
-    API[API Service<br/>REST + Analyses]
+    %% =========================
+    %% OUTPUT
+    %% =========================
+    API["REST API"]
 
-    %% === FUTURE ===
-    STUDIO[SEZRA Studio<br/>External Tools]
+    %% =========================
+    %% FUTURE
+    %% =========================
+    STUDIO["SEZRA Studio"]
 
-    %% === DATA FLOW ===
-    EXTERNAL --> ADAPTER
-    ADAPTER --> RABBIT
+    %% =========================
+    %% LEGEND
+    %% =========================
+    subgraph Legend["Legend"]
+        L1["External Sources"]
+        L2["Event Fabric"]
+        L3["Processing Services"]
+        L4["Storage"]
+    end
 
-    RABBIT --> SPIKE
-    RABBIT --> DROP
-    RABBIT --> EMBED
+    %% =========================
+    %% DATA FLOW
+    %% =========================
+    EXTERNAL -->|"raw events"| ADAPTER
+    ADAPTER -->|"publish"| RABBIT
 
-    SPIKE --> RABBIT
-    DROP --> RABBIT
+    RABBIT -->|"observe"| SPIKE
+    RABBIT -->|"observe"| DROP
+    RABBIT -->|"embed"| EMBED
 
-    EMBED --> QDRANT
+    SPIKE -->|"anomalies"| RABBIT
+    DROP -->|"anomalies"| RABBIT
 
-    RABBIT --> ANALYZER
-    QDRANT --> ANALYZER
+    EMBED -->|"embeddings"| QDRANT
 
-    ANALYZER --> RABBIT
+    RABBIT -->|"anomaly events"| ANALYZER
+    QDRANT -->|"semantic context"| ANALYZER
 
-    RABBIT --> EVENTSTORE
+    ANALYZER -->|"analyses"| RABBIT
+
+    RABBIT -->|"persist"| EVENTSTORE
     EVENTSTORE --> PG
 
-    API --> PG
-    API --> QDRANT
-    API --> RABBIT
+    API -->|"query"| PG
+    API -->|"semantic search"| QDRANT
+    API -->|"live events"| RABBIT
 
-    STUDIO --> API
+    STUDIO -->|"visual workflows"| API
 
-    %% === APPLY STYLES ===
+    %% =========================
+    %% APPLY STYLES
+    %% =========================
     class External external
     class RABBIT bus
     class SPIKE,DROP detector
@@ -162,37 +199,40 @@ flowchart TD
     class Storage,PG,EVENTSTORE storage
     class ANALYZER core
     class API api
+    class Legend,L1,L2,L3,L4 legend
 ```
 
-SEZRA services are independently deployable and replaceable. A detector can be written in Python, an adapter in Go, an enricher in Rust — as long as they speak SEZRA events, they belong in the system.
+SEZRA services are independently deployable and replaceable.
+
+A detector can be written in Python, an adapter in Go, an enricher in Rust — as long as they speak SEZRA events, they belong in the system.
 
 ---
 
 # Current MVP Features
 
-- Semantic anomaly analysis
-- Context-aware event correlation
-- Human-readable operational reasoning
-- RabbitMQ event fabric with proper envelopes
-- PostgreSQL event store
-- Qdrant semantic vector search
-- REST API
-- Dead-letter event persistence
-- Failure classification
-- Envelope validation
-- Runtime health checks
-- Docker Compose deployment
-- Hyper-decoupled services
+* Semantic anomaly analysis
+* Context-aware event correlation
+* Human-readable operational reasoning
+* RabbitMQ event fabric with proper envelopes
+* PostgreSQL event store
+* Qdrant semantic vector search
+* REST API
+* Dead-letter event persistence
+* Failure classification
+* Envelope validation
+* Runtime health checks
+* Docker Compose deployment
+* Hyper-decoupled services
 
 ---
 
 # Example Use Cases
 
-- Correlate application latency spikes with infrastructure signals
-- Enrich operational telemetry with semantic context
-- Analyze CI/CD failures
-- Process business events semantically
-- Run headless operational reasoning pipelines
+* Correlate application latency spikes with infrastructure signals
+* Enrich operational telemetry with semantic context
+* Analyze CI/CD failures
+* Process business events semantically
+* Run headless operational reasoning pipelines
 
 ---
 
@@ -206,23 +246,26 @@ The engine itself remains fully usable without Studio.
 
 # Roadmap
 
-**Near-term:**
-- Statistical baseline detectors
-- Additional adapters & enrichers
-- Improved semantic reasoning
-- Public demo environment
+## Near-term
 
-**Long-term:**
-- Visual pipeline orchestration (Studio)
-- Plugin ecosystem
-- Advanced reasoning services
-- Enterprise integrations
+* Statistical baseline detectors
+* Additional adapters & enrichers
+* Improved semantic reasoning
+* Public demo environment
+
+## Long-term
+
+* Visual pipeline orchestration (Studio)
+* Plugin ecosystem
+* Advanced reasoning services
+* Enterprise integrations
 
 ---
 
 # Philosophy
 
-Operational systems already produce enormous amounts of events.  
+Operational systems already produce enormous amounts of events.
+
 The missing piece is **semantic understanding**.
 
 SEZRA exists to transform isolated operational signals into contextual, human-understandable operational reasoning.
