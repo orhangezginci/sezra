@@ -32,18 +32,18 @@ cat > "$INBOX/cpu-usage-context.json" <<EOF
   "context_type": "metric",
   "metric": "cpu_usage_percent",
   "service": "checkout-api",
-  "value": 94
+  "value": 18
 }
 EOF
 
-log "Creating API latency observations..."
+log "Creating API latency drop observations..."
 
 cat > "$INBOX/api-latency-baseline-1.json" <<EOF
 {
   "source_type": "observation",
   "metric": "api_latency_ms",
   "service": "checkout-api",
-  "value": 178
+  "value": 420
 }
 EOF
 
@@ -52,7 +52,7 @@ cat > "$INBOX/api-latency-baseline-2.json" <<EOF
   "source_type": "observation",
   "metric": "api_latency_ms",
   "service": "checkout-api",
-  "value": 181
+  "value": 418
 }
 EOF
 
@@ -61,16 +61,16 @@ cat > "$INBOX/api-latency-baseline-3.json" <<EOF
   "source_type": "observation",
   "metric": "api_latency_ms",
   "service": "checkout-api",
-  "value": 184
+  "value": 421
 }
 EOF
 
-cat > "$INBOX/api-latency-spike.json" <<EOF
+cat > "$INBOX/api-latency-drop.json" <<EOF
 {
   "source_type": "observation",
   "metric": "api_latency_ms",
   "service": "checkout-api",
-  "value": 420
+  "value": 180
 }
 EOF
 
@@ -82,4 +82,4 @@ else
   docker compose up --no-build --force-recreate json-file-adapter
 fi
 
-log "Metric-to-metric demo events published."
+log "Metric drop demo events published."

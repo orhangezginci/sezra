@@ -158,6 +158,25 @@ services:
     volumes:
       - ./services/drop-detector-service:/app
 
+  deviation-detector-service:
+    build:
+      context: .
+      dockerfile: services/deviation-detector-service/Dockerfile
+    container_name: sezra-deviation-detector-service
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    volumes:
+      - ./services/deviation-detector-service:/app
+    profiles:
+      - deviation-detectors
+    restart: unless-stopped
+    
   spike-detector-service:
     build:
       context: .

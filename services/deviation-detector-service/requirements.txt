@@ -1,0 +1,4 @@
+-r ../../requirements/base.txt
+-r ../../requirements/messaging.txt
+
+numpy

@@ -44,8 +44,8 @@ if [ "$SKIP_RESET" = false ]; then
   ./scripts/reset-demo-data.sh >/dev/null 2>&1
 fi
 
-echo "Ensuring spike detector is running..."
-docker compose up -d spike-detector-service >/dev/null 2>&1
+echo "Ensuring deviation detector is running..."
+docker compose --profile deviation-detectors up -d deviation-detector-service >/dev/null 2>&1
 
 echo "Running metric-to-metric demo scenario..."
 ./scripts/demo-metric-context.sh --quiet
