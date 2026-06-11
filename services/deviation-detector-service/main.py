@@ -2,11 +2,14 @@ import json
 import os
 import time
 from datetime import datetime, timezone
-from uuid import uuid4
 from enum import Enum
+from pathlib import Path
+from uuid import uuid4
 
 import numpy as np
 import pika
+
+COMPONENT_METADATA_PATH = Path("/app/component.json")
 
 metric_history: dict[str, list[float]] = {}
 
@@ -164,6 +167,14 @@ def create_anomaly_event(
 
 
 def main() -> None:
+    with open(COMPONENT_METADATA_PATH, "r") as file:
+        component_metadata = json.load(file)
+
+    print(
+        f"Starting component: "
+        f"{component_metadata['display_name']} "
+        f"({component_metadata['id']})"
+)
     print("SEZRA deviation-detector-service started")
 
     connection = connect_to_rabbitmq()

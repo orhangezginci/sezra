@@ -1,0 +1,13 @@
+{
+  "id": "deviation-detector",
+  "service_name": "deviation-detector-service",
+  "display_name": "Deviation Detector",
+  "category": "detector",
+  "description": "Detects statistically significant spikes and drops from recent metric baseline behavior.",
+  "input_event_stream": "sezra.stream.raw",
+  "output_event_stream": "sezra.stream.anomaly",
+  "consumes": ["Observation"],
+  "produces": ["AnomalyDetected"],
+  "outputs": ["spike", "drop"],
+  "status": "experimental"
+}
