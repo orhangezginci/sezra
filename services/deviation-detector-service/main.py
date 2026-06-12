@@ -11,11 +11,21 @@ import pika
 
 COMPONENT_METADATA_PATH = Path("/app/component.json")
 
+
+def load_component_metadata() -> dict:
+    with open(COMPONENT_METADATA_PATH, "r") as file:
+        return json.load(file)
+
+
+component_metadata = load_component_metadata()
+config = component_metadata["config"]
+
+
 metric_history: dict[str, list[float]] = {}
 
-MIN_HISTORY_SIZE = 3
-DEVIATION_STDDEV_MULTIPLIER = 2
-MAX_HISTORY_SIZE = 50
+MIN_HISTORY_SIZE = config["min_history_size"]
+DEVIATION_STDDEV_MULTIPLIER = config["stddev_multiplier"]
+MAX_HISTORY_SIZE = config["max_history_size"]
 
 RAW_EXCHANGE = "sezra.stream.raw"
 ANOMALY_EXCHANGE = "sezra.stream.anomaly"
@@ -71,7 +81,7 @@ def should_process(envelope: dict) -> bool:
     source_type = payload.get("source_type")
 
     if source_type != "observation":
-        print(f"Ignored non-observation event: " f"source_type={source_type}")
+        print(f"Ignored non-observation event: source_type={source_type}")
         return False
 
     return True
@@ -167,14 +177,11 @@ def create_anomaly_event(
 
 
 def main() -> None:
-    with open(COMPONENT_METADATA_PATH, "r") as file:
-        component_metadata = json.load(file)
-
     print(
         f"Starting component: "
         f"{component_metadata['display_name']} "
         f"({component_metadata['id']})"
-)
+    )
     print("SEZRA deviation-detector-service started")
 
     connection = connect_to_rabbitmq()
