@@ -1,0 +1,21 @@
+{
+"id": "{{COMPONENT_ID}}",
+"service_name": "{{SERVICE_NAME}}",
+"display_name": "{{DISPLAY_NAME}}",
+"version": "1.0.0",
+"detector_type": "statistical",
+"supported_anomalies": [
+"spike",
+"drop"
+],
+"config": {
+"min_history_size": 3,
+"stddev_multiplier": 2,
+"max_history_size": 50
+},
+"rabbitmq": {
+  "queue": "sezra.queue.{{COMPONENT_ID}}",
+  "input_exchange": "sezra.stream.raw",
+  "output_exchange": "sezra.stream.anomaly"
+}
+}

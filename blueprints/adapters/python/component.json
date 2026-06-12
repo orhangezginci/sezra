@@ -1,0 +1,18 @@
+{
+  "id": "{{COMPONENT_ID}}",
+  "service_name": "{{SERVICE_NAME}}",
+  "display_name": "{{DISPLAY_NAME}}",
+  "version": "1.0.0",
+  "adapter_type": "json-file",
+  "config": {
+    "input_folder": "/data/inbox",
+    "processed_folder": "/data/processed"
+  },
+  "rabbitmq": {
+    "output_exchange": "sezra.stream.raw"
+  },
+  "produces": [
+    "ObservationReceived",
+    "ContextReceived"
+  ]
+}
