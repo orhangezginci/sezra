@@ -19,6 +19,7 @@ def load_component_metadata() -> dict:
 
 component_metadata = load_component_metadata()
 config = component_metadata["config"]
+rabbitmq_config = component_metadata["rabbitmq"]
 
 
 metric_history: dict[str, list[float]] = {}
@@ -27,9 +28,10 @@ MIN_HISTORY_SIZE = config["min_history_size"]
 DEVIATION_STDDEV_MULTIPLIER = config["stddev_multiplier"]
 MAX_HISTORY_SIZE = config["max_history_size"]
 
-RAW_EXCHANGE = "sezra.stream.raw"
-ANOMALY_EXCHANGE = "sezra.stream.anomaly"
-QUEUE_NAME = "sezra.queue.deviation_detector"
+RAW_EXCHANGE = rabbitmq_config["input_exchange"]
+ANOMALY_EXCHANGE = rabbitmq_config["output_exchange"]
+QUEUE_NAME = rabbitmq_config["queue"]
+
 
 
 class DeviationType(str, Enum):
@@ -160,7 +162,7 @@ def create_anomaly_event(
     return {
         "event_id": str(uuid4()),
         "event_type": "AnomalyDetected",
-        "source": "deviation-detector-service",
+        "source": component_metadata["service_name"],
         "occurred_at": datetime.now(timezone.utc).isoformat(),
         "correlation_id": envelope["event_id"],
         "causation_id": envelope["event_id"],

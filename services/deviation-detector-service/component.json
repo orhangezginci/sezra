@@ -11,5 +11,10 @@
 "min_history_size": 3,
 "stddev_multiplier": 2,
 "max_history_size": 50
+},
+"rabbitmq": {
+  "queue": "sezra.queue.deviation_detector",
+  "input_exchange": "sezra.stream.raw",
+  "output_exchange": "sezra.stream.anomaly"
 }
 }
