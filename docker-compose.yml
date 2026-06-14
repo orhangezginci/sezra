@@ -19,7 +19,7 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -34,7 +34,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sezra -d sezra"]
+      test: [ "CMD-SHELL", "pg_isready -U sezra -d sezra" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -48,7 +48,7 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
     healthcheck:
-      test: ["CMD", "bash", "-lc", "echo > /dev/tcp/localhost/6333"]
+      test: [ "CMD", "bash", "-lc", "echo > /dev/tcp/localhost/6333" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -176,7 +176,22 @@ services:
     profiles:
       - deviation-detectors
     restart: unless-stopped
-    
+  threshold-detector-tutorial:
+    build:
+      context: .
+      dockerfile: examples/tutorials/threshold-detector/Dockerfile
+    container_name: sezra-threshold-detector-tutorial
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    profiles:
+      - tutorials
+
   spike-detector-service:
     build:
       context: .
@@ -261,7 +276,7 @@ services:
     volumes:
       - ./services/api-service:/app
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      test: [ "CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
