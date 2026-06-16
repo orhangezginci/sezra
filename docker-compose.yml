@@ -280,6 +280,26 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  gmail-adapter-service:
+    build:
+      context: .
+      dockerfile: services/gmail-adapter-service/Dockerfile
+    container_name: sezra-gmail-adapter-service
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+
+      GMAIL_EMAIL: ${GMAIL_EMAIL}
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
+    volumes:
+      - ./services/gmail-adapter-service:/app
+    profiles:
+      - gmail-adapter  
 
 volumes:
   rabbitmq_data:

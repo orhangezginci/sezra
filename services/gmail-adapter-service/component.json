@@ -1,0 +1,19 @@
+{
+  "id": "gmail-adapter",
+  "service_name": "gmail-adapter-service",
+  "display_name": "Gmail Adapter",
+  "version": "1.0.0",
+  "adapter_type": "gmail",
+  "produces": [
+    "ContextReceived"
+  ],
+  "config": {
+    "imap_host": "imap.gmail.com",
+    "imap_port": 993,
+    "poll_interval_seconds": 15,
+    "subject_keyword": "SEZRA"
+  },
+  "rabbitmq": {
+    "exchange": "sezra.stream.raw"
+  }
+}
