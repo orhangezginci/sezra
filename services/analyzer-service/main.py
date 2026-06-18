@@ -9,7 +9,6 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchValue
 from sentence_transformers import SentenceTransformer
 
-
 CONTEXT_SEARCH_RETRIES = 5
 CONTEXT_SEARCH_RETRY_DELAY_SECONDS = 2
 
@@ -17,7 +16,9 @@ COLLECTION_NAME = "sezra_events"
 MODEL_NAME = "all-MiniLM-L6-v2"
 
 ANOMALY_EXCHANGE = "sezra.stream.anomaly"
+INVESTIGATION_EXCHANGE = "sezra.stream.investigation"
 ANALYSIS_EXCHANGE = "sezra.stream.analysis"
+
 QUEUE_NAME = "sezra.queue.analyzer"
 
 ANALYZER_DEAD_LETTER_EXCHANGE = "sezra.stream.dead_letter"
@@ -95,9 +96,7 @@ def build_anomaly_search_text(anomaly_event: dict) -> str:
         parts.append(f"Anomaly detected for metric {metric}.")
 
     if previous_value is not None and current_value is not None:
-        parts.append(
-            f"The value changed from {previous_value} to {current_value}."
-        )
+        parts.append(f"The value changed from {previous_value} to {current_value}.")
 
     if drop_amount is not None:
         parts.append(f"The detected drop amount is {drop_amount}.")
@@ -173,11 +172,7 @@ def build_summary(
     drop_amount = payload.get("drop_amount")
     increase_amount = payload.get("increase_amount")
 
-    anomaly_label = (
-        f"{anomaly_type} anomaly"
-        if anomaly_type
-        else "anomaly"
-    )
+    anomaly_label = f"{anomaly_type} anomaly" if anomaly_type else "anomaly"
 
     summary = (
         f'SEZRA detected a {anomaly_label} for metric "{metric}". '
@@ -218,8 +213,7 @@ def build_human_readable_analysis(
     title = f"{anomaly_type.capitalize()} anomaly detected"
 
     detected_anomaly = (
-        f'Metric "{metric}" changed from '
-        f"{previous_value} to {current_value}."
+        f'Metric "{metric}" changed from ' f"{previous_value} to {current_value}."
     )
 
     if increase_amount is not None:
@@ -365,6 +359,12 @@ def main() -> None:
     )
 
     channel.exchange_declare(
+        exchange=INVESTIGATION_EXCHANGE,
+        exchange_type="fanout",
+        durable=True,
+    )
+
+    channel.exchange_declare(
         exchange=ANALYSIS_EXCHANGE,
         exchange_type="fanout",
         durable=True,
@@ -386,16 +386,31 @@ def main() -> None:
         queue=QUEUE_NAME,
     )
 
+    channel.queue_bind(
+        exchange=INVESTIGATION_EXCHANGE,
+        queue=QUEUE_NAME,
+    )
+
     print(f"Listening on queue: {QUEUE_NAME}")
 
     def handle_message(channel, method, properties, body):
         try:
-            anomaly_event = json.loads(body.decode("utf-8"))
-            validate_event_envelope(anomaly_event)
+            event = json.loads(body.decode("utf-8"))
+            validate_event_envelope(event)
 
-            event_id = anomaly_event.get("event_id")
+            event_id = event.get("event_id")
+            event_type = event.get("event_type")
 
-            print(f"Received anomaly event: {event_id}")
+            print(f"Received event: " f"{event_type} " f"({event_id})")
+
+            if event_type != "AnomalyDetected":
+                print(f"Skipping unsupported event type: " f"{event_type}")
+
+                channel.basic_ack(
+                    delivery_tag=method.delivery_tag,
+                )
+
+                return
 
             related_contexts = []
 
@@ -403,7 +418,7 @@ def main() -> None:
                 related_contexts = search_related_contexts(
                     qdrant_client=qdrant_client,
                     embedding_model=embedding_model,
-                    anomaly_event=anomaly_event,
+                    anomaly_event=event,
                 )
 
                 if related_contexts:
@@ -420,14 +435,14 @@ def main() -> None:
             print(f"Related contexts: {related_contexts}")
 
             human_readable = build_human_readable_analysis(
-                anomaly_event=anomaly_event,
+                anomaly_event=event,
                 related_contexts=related_contexts,
             )
 
             print_human_readable_analysis(human_readable)
 
             analysis_event = create_analysis_event(
-                anomaly_event=anomaly_event,
+                anomaly_event=event,
                 related_contexts=related_contexts,
             )
 
