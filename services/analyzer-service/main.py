@@ -109,7 +109,33 @@ def build_anomaly_search_text(anomaly_event: dict) -> str:
 
     return " ".join(parts)
 
+def build_investigation_search_text(
+    investigation_event: dict,
+) -> str:
+    payload = investigation_event.get("payload", {})
 
+    parts = []
+
+    reason = payload.get("reason")
+    subject = payload.get("subject")
+    summary = payload.get("summary")
+
+    if reason:
+        parts.append(
+            f"Investigation reason: {reason}."
+        )
+
+    if subject:
+        parts.append(
+            f"Subject: {subject}."
+        )
+
+    if summary:
+        parts.append(
+            f"Summary: {summary}."
+        )
+
+    return " ".join(parts)
 def search_related_contexts(
     qdrant_client: QdrantClient,
     embedding_model: SentenceTransformer,
