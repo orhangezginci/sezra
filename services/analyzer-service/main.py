@@ -27,10 +27,8 @@ ANALYZER_DEAD_LETTER_ROUTING_KEY = "analyzer-service.failed"
 
 def required_env(name: str) -> str:
     value = os.getenv(name)
-
     if not value:
         raise RuntimeError(f"Missing required environment variable: {name}")
-
     return value
 
 
@@ -109,40 +107,31 @@ def build_anomaly_search_text(anomaly_event: dict) -> str:
 
     return " ".join(parts)
 
-def build_investigation_search_text(
-    investigation_event: dict,
-) -> str:
+
+def build_investigation_search_text(investigation_event: dict) -> str:
     payload = investigation_event.get("payload", {})
 
     parts = []
-
     reason = payload.get("reason")
     subject = payload.get("subject")
     summary = payload.get("summary")
 
     if reason:
-        parts.append(
-            f"Investigation reason: {reason}."
-        )
-
+        parts.append(f"Investigation reason: {reason}.")
     if subject:
-        parts.append(
-            f"Subject: {subject}."
-        )
-
+        parts.append(f"Subject: {subject}.")
     if summary:
-        parts.append(
-            f"Summary: {summary}."
-        )
+        parts.append(f"Summary: {summary}.")
 
     return " ".join(parts)
+
+
 def search_related_contexts(
     qdrant_client: QdrantClient,
     embedding_model: SentenceTransformer,
     anomaly_event: dict,
 ) -> list[dict]:
     search_text = build_anomaly_search_text(anomaly_event)
-
     print(f"Semantic anomaly query: {search_text}")
 
     vector = embedding_model.encode(search_text).tolist()
@@ -166,8 +155,7 @@ def search_related_contexts(
 
     for point in response.points:
         text = point.payload.get("text")
-
-        if text in seen_texts:
+        if not text or text in seen_texts:
             continue
 
         seen_texts.add(text)
@@ -207,7 +195,6 @@ def build_summary(
 
     if drop_amount is not None:
         summary += f" Detected drop amount: {drop_amount}."
-
     if increase_amount is not None:
         summary += f" Detected increase amount: {increase_amount}."
 
@@ -239,20 +226,19 @@ def build_human_readable_analysis(
     title = f"{anomaly_type.capitalize()} anomaly detected"
 
     detected_anomaly = (
-        f'Metric "{metric}" changed from ' f"{previous_value} to {current_value}."
+        f'Metric "{metric}" changed from {previous_value} to {current_value}.'
     )
 
     if increase_amount is not None:
         detected_anomaly += f" Increase amount: {increase_amount}."
-
     if drop_amount is not None:
         detected_anomaly += f" Drop amount: {drop_amount}."
 
-    if related_contexts:
-        best_context = related_contexts[0]
-        most_relevant_context = best_context.get("text")
-    else:
-        most_relevant_context = "No relevant contextual signal was found."
+    most_relevant_context = (
+        related_contexts[0].get("text")
+        if related_contexts
+        else "No relevant contextual signal was found."
+    )
 
     possible_interpretation = (
         "The related context may help explain the detected anomaly. "
@@ -334,10 +320,7 @@ def publish_dead_letter_event(
             "reason": reason,
             "error_type": type(error).__name__,
             "error_message": str(error),
-            "original_body": original_body.decode(
-                "utf-8",
-                errors="replace",
-            ),
+            "original_body": original_body.decode("utf-8", errors="replace"),
         },
     }
 
@@ -352,8 +335,7 @@ def publish_dead_letter_event(
     )
 
     print(
-        "Published dead-letter event: "
-        f"{failed_event['event_id']} "
+        f"Published dead-letter event: {failed_event['event_id']} "
         f"(class={failure_class})"
     )
 
@@ -365,57 +347,32 @@ def main() -> None:
     embedding_model = SentenceTransformer(MODEL_NAME)
     print("Embedding model loaded")
 
-    qdrant_client = QdrantClient(
-        host=QDRANT_HOST,
-        port=QDRANT_PORT,
-    )
+    qdrant_client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
 
     collections = qdrant_client.get_collections()
-
     print("Connected to Qdrant")
     print(f"Collections: {collections}")
 
     connection = connect_to_rabbitmq()
     channel = connection.channel()
 
-    channel.exchange_declare(
-        exchange=ANOMALY_EXCHANGE,
-        exchange_type="fanout",
-        durable=True,
-    )
+    # Declare exchanges
+    for exchange in (
+        ANOMALY_EXCHANGE,
+        INVESTIGATION_EXCHANGE,
+        ANALYSIS_EXCHANGE,
+        ANALYZER_DEAD_LETTER_EXCHANGE,
+    ):
+        channel.exchange_declare(
+            exchange=exchange,
+            exchange_type="fanout",
+            durable=True,
+        )
 
-    channel.exchange_declare(
-        exchange=INVESTIGATION_EXCHANGE,
-        exchange_type="fanout",
-        durable=True,
-    )
+    channel.queue_declare(queue=QUEUE_NAME, durable=True)
 
-    channel.exchange_declare(
-        exchange=ANALYSIS_EXCHANGE,
-        exchange_type="fanout",
-        durable=True,
-    )
-
-    channel.exchange_declare(
-        exchange=ANALYZER_DEAD_LETTER_EXCHANGE,
-        exchange_type="fanout",
-        durable=True,
-    )
-
-    channel.queue_declare(
-        queue=QUEUE_NAME,
-        durable=True,
-    )
-
-    channel.queue_bind(
-        exchange=ANOMALY_EXCHANGE,
-        queue=QUEUE_NAME,
-    )
-
-    channel.queue_bind(
-        exchange=INVESTIGATION_EXCHANGE,
-        queue=QUEUE_NAME,
-    )
+    channel.queue_bind(exchange=ANOMALY_EXCHANGE, queue=QUEUE_NAME)
+    channel.queue_bind(exchange=INVESTIGATION_EXCHANGE, queue=QUEUE_NAME)
 
     print(f"Listening on queue: {QUEUE_NAME}")
 
@@ -427,17 +384,23 @@ def main() -> None:
             event_id = event.get("event_id")
             event_type = event.get("event_type")
 
-            print(f"Received event: " f"{event_type} " f"({event_id})")
+            print(f"Received event: {event_type} ({event_id})")
 
-            if event_type != "AnomalyDetected":
-                print(f"Skipping unsupported event type: " f"{event_type}")
+            # === Investigation Requested ===
+            if event_type == "InvestigationRequested":
+                search_text = build_investigation_search_text(event)
+                print(f"Investigation search text: {search_text}")
 
-                channel.basic_ack(
-                    delivery_tag=method.delivery_tag,
-                )
-
+                channel.basic_ack(delivery_tag=method.delivery_tag)
                 return
 
+            # === Unsupported event type ===
+            if event_type != "AnomalyDetected":
+                print(f"Skipping unsupported event type: {event_type}")
+                channel.basic_ack(delivery_tag=method.delivery_tag)
+                return
+
+            # === Anomaly Detected - main processing ===
             related_contexts = []
 
             for attempt in range(CONTEXT_SEARCH_RETRIES):
@@ -452,13 +415,11 @@ def main() -> None:
 
                 print(
                     f"No related context found yet. "
-                    f"Retrying context search "
-                    f"({attempt + 1}/{CONTEXT_SEARCH_RETRIES})..."
+                    f"Retrying context search ({attempt + 1}/{CONTEXT_SEARCH_RETRIES})..."
                 )
-
                 time.sleep(CONTEXT_SEARCH_RETRY_DELAY_SECONDS)
 
-            print(f"Related contexts: {related_contexts}")
+            print(f"Related contexts found: {len(related_contexts)}")
 
             human_readable = build_human_readable_analysis(
                 anomaly_event=event,
@@ -488,7 +449,6 @@ def main() -> None:
 
         except json.JSONDecodeError as error:
             print(f"Invalid JSON received: {error}")
-
             publish_dead_letter_event(
                 channel=channel,
                 original_body=body,
@@ -496,14 +456,10 @@ def main() -> None:
                 reason="Invalid JSON payload",
                 failure_class="permanent",
             )
-
-            channel.basic_ack(
-                delivery_tag=method.delivery_tag,
-            )
+            channel.basic_ack(delivery_tag=method.delivery_tag)
 
         except ValueError as error:
             print(f"Invalid SEZRA event envelope: {error}")
-
             publish_dead_letter_event(
                 channel=channel,
                 original_body=body,
@@ -511,14 +467,10 @@ def main() -> None:
                 reason="Invalid SEZRA event envelope",
                 failure_class="permanent",
             )
-
-            channel.basic_ack(
-                delivery_tag=method.delivery_tag,
-            )
+            channel.basic_ack(delivery_tag=method.delivery_tag)
 
         except Exception as error:
             print(f"Unexpected analyzer error: {error}")
-
             publish_dead_letter_event(
                 channel=channel,
                 original_body=body,
@@ -526,10 +478,7 @@ def main() -> None:
                 reason="Unexpected analyzer processing failure",
                 failure_class="transient",
             )
-
-            channel.basic_ack(
-                delivery_tag=method.delivery_tag,
-            )
+            channel.basic_ack(delivery_tag=method.delivery_tag)
 
     channel.basic_consume(
         queue=QUEUE_NAME,
