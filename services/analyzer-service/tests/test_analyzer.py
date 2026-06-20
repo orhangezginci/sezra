@@ -1,4 +1,4 @@
-from main import build_investigation_search_text
+from main import build_investigation_search_text, build_investigation_summary
 from main import search_semantic_evidence
 
 
@@ -76,3 +76,27 @@ def test_search_semantic_evidence_returns_qdrant_results():
             "payload": {"foo": "bar"},
         }
     ]
+def test_build_investigation_summary():
+    event = {
+        "payload": {
+            "subject": "antibiotic dose delayed",
+        }
+    }
+
+    evidence = [
+        {
+            "text": "Patient complaint",
+        },
+        {
+            "text": "Restock delay metric",
+        },
+    ]
+
+    result = build_investigation_summary(
+        event,
+        evidence,
+    )
+
+    assert "antibiotic dose delayed" in result
+    assert "Patient complaint" in result
+    assert "Restock delay metric" in result

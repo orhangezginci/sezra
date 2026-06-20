@@ -306,8 +306,31 @@ def search_semantic_evidence(
         )
 
     return results
+def build_investigation_summary(
+    investigation_event: dict,
+    evidence: list[dict],
+) -> str:
+    payload = investigation_event.get("payload", {})
 
+    subject = payload.get(
+        "subject",
+        "unknown investigation",
+    )
 
+    lines = [
+        f"Investigation: {subject}",
+        "",
+        "Relevant evidence:",
+    ]
+
+    for item in evidence:
+        text = item.get("text")
+
+        if text:
+            lines.append(f"- {text}")
+
+    return "\n".join(lines)
+    
 def create_analysis_event(
     anomaly_event: dict,
     related_contexts: list[dict],
