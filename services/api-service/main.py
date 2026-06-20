@@ -24,9 +24,11 @@ qdrant_client = QdrantClient(
 
 embedding_model = SentenceTransformer(MODEL_NAME)
 
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
 
 def serialize_event(event: StoredEventEnvelope) -> dict:
     return {
@@ -39,7 +41,8 @@ def serialize_event(event: StoredEventEnvelope) -> dict:
         "causation_id": event.causation_id,
         "payload": event.payload,
     }
-    
+
+
 @app.get("/analyses/latest")
 def get_latest_analysis():
     session = SessionLocal()
@@ -59,6 +62,8 @@ def get_latest_analysis():
 
     finally:
         session.close()
+
+
 @app.get("/investigations/latest")
 def get_latest_investigation():
     session = SessionLocal()
@@ -78,6 +83,29 @@ def get_latest_investigation():
 
     finally:
         session.close()
+
+
+@app.get("/events/timeline/{event_id}")
+def get_event_timeline(event_id: str):
+    session = SessionLocal()
+
+    try:
+        events = (
+            session.query(StoredEventEnvelope)
+            .filter(
+                (StoredEventEnvelope.event_id == event_id)
+                | (StoredEventEnvelope.correlation_id == event_id)
+                | (StoredEventEnvelope.causation_id == event_id)
+            )
+            .order_by(StoredEventEnvelope.received_at)
+            .all()
+        )
+
+        return [serialize_event(event) for event in events]
+
+    finally:
+        session.close()
+
 
 @app.get("/events")
 def get_events(limit: int = 20):
@@ -137,6 +165,8 @@ def get_event(event_id: str):
         "causation_id": event.causation_id,
         "payload": event.payload,
     }
+
+
 @app.get("/events/type/{event_type}")
 def get_events_by_type(event_type: str, limit: int = 20):
     session = SessionLocal()
@@ -167,6 +197,7 @@ def get_events_by_type(event_type: str, limit: int = 20):
     finally:
         session.close()
 
+
 @app.get("/events/correlation/{correlation_id}")
 def get_events_by_correlation(correlation_id: str, limit: int = 20):
     session = SessionLocal()
@@ -196,6 +227,8 @@ def get_events_by_correlation(correlation_id: str, limit: int = 20):
 
     finally:
         session.close()
+
+
 @app.get("/semantic/search")
 def semantic_search(query: str, limit: int = 5, source_type: str | None = None):
     vector = embedding_model.encode(query).tolist()
