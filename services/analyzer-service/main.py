@@ -273,7 +273,30 @@ def search_semantic_evidence(
     search_text: str,
     limit: int = 5,
 ) -> list[dict]:
-    return []
+    print(f"Semantic evidence query: {search_text}")
+
+    vector = embedding_model.encode(search_text).tolist()
+
+    response = qdrant_client.query_points(
+        collection_name=COLLECTION_NAME,
+        query=vector,
+        limit=limit,
+    )
+
+    results = []
+
+    for point in response.points:
+        results.append(
+            {
+                "score": point.score,
+                "event_id": point.payload.get("event_id"),
+                "source": point.payload.get("source"),
+                "text": point.payload.get("text"),
+                "payload": point.payload.get("payload"),
+            }
+        )
+
+    return results
 
 def create_analysis_event(
     anomaly_event: dict,

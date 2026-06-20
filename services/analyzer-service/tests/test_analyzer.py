@@ -27,11 +27,52 @@ def test_build_investigation_search_text_with_empty_payload():
 
     assert result == ""
 
-def test_search_semantic_evidence_placeholder_returns_empty_list():
+class FakeEmbeddingModel:
+    def encode(self, text):
+        assert text == "test"
+        return FakeVector()
+
+
+class FakeVector:
+    def tolist(self):
+        return [0.1, 0.2, 0.3]
+
+
+class FakePoint:
+    score = 0.9
+    payload = {
+        "event_id": "event-1",
+        "source": "test-source",
+        "text": "test evidence",
+        "payload": {"foo": "bar"},
+    }
+
+
+class FakeResponse:
+    points = [FakePoint()]
+
+
+class FakeQdrantClient:
+    def query_points(self, collection_name, query, limit):
+        assert collection_name == "sezra_events"
+        assert query == [0.1, 0.2, 0.3]
+        assert limit == 5
+        return FakeResponse()
+
+
+def test_search_semantic_evidence_returns_qdrant_results():
     result = search_semantic_evidence(
-        qdrant_client=None,
-        embedding_model=None,
+        qdrant_client=FakeQdrantClient(),
+        embedding_model=FakeEmbeddingModel(),
         search_text="test",
     )
 
-    assert result == []
+    assert result == [
+        {
+            "score": 0.9,
+            "event_id": "event-1",
+            "source": "test-source",
+            "text": "test evidence",
+            "payload": {"foo": "bar"},
+        }
+    ]
