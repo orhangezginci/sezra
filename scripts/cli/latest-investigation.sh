@@ -10,11 +10,23 @@ echo "SEZRA Investigation"
 echo "==================="
 echo
 
-echo "$event_json" | jq -r '.payload.summary'
+echo "Subject"
+echo "-------"
+echo "$event_json" | jq -r '.payload.summary | split("\n")[0] | sub("^Investigation: "; "")'
+
+echo
+echo "Evidence"
+echo "--------"
+
+echo "$event_json" | jq -r '
+.payload.evidence
+| to_entries[]
+| "\n[\(.key + 1)] \(.value.text)\n    Source: \(.value.source)\n    Score : \((.value.score * 1000 | round) / 1000)"
+'
 
 echo
 echo "Metadata"
 echo "--------"
-echo "$event_json" | jq -r '"Event ID: " + .event_id'
-echo "$event_json" | jq -r '"Occurred: " + .occurred_at'
+echo "$event_json" | jq -r '"Event ID       : " + .event_id'
 echo "$event_json" | jq -r '"Correlation ID: " + .correlation_id'
+echo "$event_json" | jq -r '"Occurred       : " + .occurred_at'
