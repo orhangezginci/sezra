@@ -267,6 +267,13 @@ def print_human_readable_analysis(human_readable: dict) -> None:
     print(human_readable["possible_interpretation"])
     print()
 
+def search_semantic_evidence(
+    qdrant_client: QdrantClient,
+    embedding_model: SentenceTransformer,
+    search_text: str,
+    limit: int = 5,
+) -> list[dict]:
+    return []
 
 def create_analysis_event(
     anomaly_event: dict,
@@ -300,6 +307,7 @@ def create_analysis_event(
     }
 
 
+    
 def publish_dead_letter_event(
     channel,
     original_body: bytes,

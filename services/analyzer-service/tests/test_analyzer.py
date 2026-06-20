@@ -1,4 +1,6 @@
 from main import build_investigation_search_text
+from main import search_semantic_evidence
+
 
 
 def test_build_investigation_search_text():
@@ -24,3 +26,12 @@ def test_build_investigation_search_text_with_empty_payload():
     result = build_investigation_search_text(event)
 
     assert result == ""
+
+def test_search_semantic_evidence_placeholder_returns_empty_list():
+    result = search_semantic_evidence(
+        qdrant_client=None,
+        embedding_model=None,
+        search_text="test",
+    )
+
+    assert result == []
