@@ -59,6 +59,25 @@ def get_latest_analysis():
 
     finally:
         session.close()
+@app.get("/investigations/latest")
+def get_latest_investigation():
+    session = SessionLocal()
+
+    try:
+        event = (
+            session.query(StoredEventEnvelope)
+            .filter(StoredEventEnvelope.event_type == "InvestigationGenerated")
+            .order_by(desc(StoredEventEnvelope.received_at))
+            .first()
+        )
+
+        if event is None:
+            raise HTTPException(status_code=404, detail="No investigation found")
+
+        return serialize_event(event)
+
+    finally:
+        session.close()
 
 @app.get("/events")
 def get_events(limit: int = 20):
