@@ -494,11 +494,26 @@ def main() -> None:
                     evidence=evidence,
                     summary=summary,
                 )
+                channel.basic_publish(
+                    exchange=ANALYSIS_EXCHANGE,
+                    routing_key="",
+                    body=json.dumps(investigation_generated_event).encode("utf-8"),
+                    properties=pika.BasicProperties(
+                        content_type="application/json",
+                        delivery_mode=2,
+                    ),
+                )
 
                 print(
                     f"Created investigation event: "
                     f"{investigation_generated_event['event_type']}"
                 )
+                print(
+                    f"Published investigation event: "
+                    f"{investigation_generated_event['event_id']}"
+                )
+
+                
 
                 print()
                 print("SEZRA Investigation")
