@@ -267,6 +267,7 @@ def print_human_readable_analysis(human_readable: dict) -> None:
     print(human_readable["possible_interpretation"])
     print()
 
+
 def search_semantic_evidence(
     qdrant_client: QdrantClient,
     embedding_model: SentenceTransformer,
@@ -297,6 +298,7 @@ def search_semantic_evidence(
         )
 
     return results
+
 
 def create_analysis_event(
     anomaly_event: dict,
@@ -330,7 +332,6 @@ def create_analysis_event(
     }
 
 
-    
 def publish_dead_letter_event(
     channel,
     original_body: bytes,
@@ -420,9 +421,28 @@ def main() -> None:
             # === Investigation Requested ===
             if event_type == "InvestigationRequested":
                 search_text = build_investigation_search_text(event)
-                print(f"Investigation search text: {search_text}")
 
-                channel.basic_ack(delivery_tag=method.delivery_tag)
+                print(f"Investigation search text: " f"{search_text}")
+
+                evidence = search_semantic_evidence(
+                    qdrant_client=qdrant_client,
+                    embedding_model=embedding_model,
+                    search_text=search_text,
+                )
+
+                print(f"Evidence candidates found: " f"{len(evidence)}")
+                for item in evidence:
+                    print(
+                        f"Evidence candidate: "
+                        f"score={item.get('score')} "
+                        f"event_id={item.get('event_id')} "
+                        f"source={item.get('source')} "
+                        f"text={item.get('text')}"
+                    )
+
+                channel.basic_ack(
+                    delivery_tag=method.delivery_tag,
+                )
                 return
 
             # === Unsupported event type ===
