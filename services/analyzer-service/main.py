@@ -460,6 +460,17 @@ def main() -> None:
                     embedding_model=embedding_model,
                     search_text=search_text,
                 )
+                summary = build_investigation_summary(
+                    investigation_event=event,
+                    evidence=evidence,
+                )
+
+                print()
+                print("SEZRA Investigation")
+                print()
+                print(summary)
+                print()
+                
 
                 print(f"Evidence candidates found: " f"{len(evidence)}")
                 for item in evidence:
