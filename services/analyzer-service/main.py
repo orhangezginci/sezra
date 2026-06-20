@@ -284,15 +284,23 @@ def search_semantic_evidence(
         limit=limit,
     )
 
+    seen_texts = set()
     results = []
 
     for point in response.points:
+        text = point.payload.get("text")
+
+        if not text or text in seen_texts:
+            continue
+
+        seen_texts.add(text)
+
         results.append(
             {
                 "score": point.score,
                 "event_id": point.payload.get("event_id"),
                 "source": point.payload.get("source"),
-                "text": point.payload.get("text"),
+                "text": text,
                 "payload": point.payload.get("payload"),
             }
         )
