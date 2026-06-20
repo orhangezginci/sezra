@@ -365,6 +365,7 @@ def create_analysis_event(
         },
     }
 
+
 def create_investigation_event(
     investigation_event: dict,
     evidence: list[dict],
@@ -385,6 +386,7 @@ def create_investigation_event(
             "source_investigation_event_id": investigation_event_id,
         },
     }
+
 
 def publish_dead_letter_event(
     channel,
@@ -424,7 +426,8 @@ def publish_dead_letter_event(
         f"Published dead-letter event: {failed_event['event_id']} "
         f"(class={failure_class})"
     )
-    
+
+
 def main() -> None:
     print("SEZRA analyzer-service started")
 
@@ -485,6 +488,16 @@ def main() -> None:
                 summary = build_investigation_summary(
                     investigation_event=event,
                     evidence=evidence,
+                )
+                investigation_generated_event = create_investigation_event(
+                    investigation_event=event,
+                    evidence=evidence,
+                    summary=summary,
+                )
+
+                print(
+                    f"Created investigation event: "
+                    f"{investigation_generated_event['event_type']}"
                 )
 
                 print()
