@@ -26,5 +26,13 @@ echo "$timeline_json" | jq -r '
 + .event_id
 + "\nSource  : "
 + .source
++ (
+    if .payload.summary then
+      "\nSummary : "
+      + (.payload.summary | split("\n")[0])
+    else
+      ""
+    end
+  )
 + "\n"
 '
