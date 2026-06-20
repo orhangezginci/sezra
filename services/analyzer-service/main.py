@@ -306,6 +306,8 @@ def search_semantic_evidence(
         )
 
     return results
+
+
 def build_investigation_summary(
     investigation_event: dict,
     evidence: list[dict],
@@ -330,7 +332,8 @@ def build_investigation_summary(
             lines.append(f"- {text}")
 
     return "\n".join(lines)
-    
+
+
 def create_analysis_event(
     anomaly_event: dict,
     related_contexts: list[dict],
@@ -362,6 +365,26 @@ def create_analysis_event(
         },
     }
 
+def create_investigation_event(
+    investigation_event: dict,
+    evidence: list[dict],
+    summary: str,
+) -> dict:
+    investigation_event_id = investigation_event["event_id"]
+
+    return {
+        "event_id": str(uuid4()),
+        "event_type": "InvestigationGenerated",
+        "source": "analyzer-service",
+        "occurred_at": datetime.now(timezone.utc).isoformat(),
+        "correlation_id": investigation_event_id,
+        "causation_id": investigation_event_id,
+        "payload": {
+            "summary": summary,
+            "evidence": evidence,
+            "source_investigation_event_id": investigation_event_id,
+        },
+    }
 
 def publish_dead_letter_event(
     channel,
@@ -401,8 +424,7 @@ def publish_dead_letter_event(
         f"Published dead-letter event: {failed_event['event_id']} "
         f"(class={failure_class})"
     )
-
-
+    
 def main() -> None:
     print("SEZRA analyzer-service started")
 
@@ -470,7 +492,6 @@ def main() -> None:
                 print()
                 print(summary)
                 print()
-                
 
                 print(f"Evidence candidates found: " f"{len(evidence)}")
                 for item in evidence:

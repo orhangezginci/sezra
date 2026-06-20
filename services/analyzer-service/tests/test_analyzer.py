@@ -1,5 +1,5 @@
 from main import build_investigation_search_text, build_investigation_summary
-from main import search_semantic_evidence
+from main import search_semantic_evidence, create_investigation_event
 
 
 
@@ -100,3 +100,34 @@ def test_build_investigation_summary():
     assert "antibiotic dose delayed" in result
     assert "Patient complaint" in result
     assert "Restock delay metric" in result
+
+
+def test_create_investigation_event():
+    investigation_event = {
+        "event_id": "investigation-123",
+    }
+
+    evidence = [
+        {
+            "text": "Patient complaint",
+        }
+    ]
+
+    result = create_investigation_event(
+        investigation_event=investigation_event,
+        evidence=evidence,
+        summary="Test summary",
+    )
+
+    assert result["event_type"] == "InvestigationGenerated"
+    assert result["source"] == "analyzer-service"
+    assert result["correlation_id"] == "investigation-123"
+    assert result["causation_id"] == "investigation-123"
+
+    assert (
+        result["payload"]["source_investigation_event_id"]
+        == "investigation-123"
+    )
+
+    assert result["payload"]["summary"] == "Test summary"
+    assert result["payload"]["evidence"] == evidence
