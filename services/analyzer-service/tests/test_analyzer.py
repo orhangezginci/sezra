@@ -2,7 +2,6 @@ from main import build_investigation_search_text, build_investigation_summary
 from main import search_semantic_evidence, create_investigation_event
 
 
-
 def test_build_investigation_search_text():
     event = {
         "payload": {
@@ -18,14 +17,14 @@ def test_build_investigation_search_text():
     assert "antibiotic dose delayed" in result
     assert "Patient family reports delay." in result
 
+
 def test_build_investigation_search_text_with_empty_payload():
-    event = {
-        "payload": {}
-    }
+    event = {"payload": {}}
 
     result = build_investigation_search_text(event)
 
     assert result == ""
+
 
 class FakeEmbeddingModel:
     def encode(self, text):
@@ -76,6 +75,8 @@ def test_search_semantic_evidence_returns_qdrant_results():
             "payload": {"foo": "bar"},
         }
     ]
+
+
 def test_build_investigation_summary():
     event = {
         "payload": {
@@ -105,6 +106,9 @@ def test_build_investigation_summary():
 def test_create_investigation_event():
     investigation_event = {
         "event_id": "investigation-123",
+        "payload": {
+            "subject": "antibiotic dose delayed",
+        },
     }
 
     evidence = [
@@ -129,5 +133,6 @@ def test_create_investigation_event():
         == "investigation-123"
     )
 
+    assert result["payload"]["subject"] == "antibiotic dose delayed"
     assert result["payload"]["summary"] == "Test summary"
     assert result["payload"]["evidence"] == evidence

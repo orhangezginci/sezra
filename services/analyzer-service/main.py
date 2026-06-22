@@ -372,6 +372,8 @@ def create_investigation_event(
     summary: str,
 ) -> dict:
     investigation_event_id = investigation_event["event_id"]
+    payload = investigation_event.get("payload", {})
+    subject = payload.get("subject", "")
 
     return {
         "event_id": str(uuid4()),
@@ -381,12 +383,12 @@ def create_investigation_event(
         "correlation_id": investigation_event_id,
         "causation_id": investigation_event_id,
         "payload": {
+            "subject": subject,
             "summary": summary,
             "evidence": evidence,
             "source_investigation_event_id": investigation_event_id,
         },
     }
-
 
 def publish_dead_letter_event(
     channel,
