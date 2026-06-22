@@ -390,6 +390,7 @@ def create_investigation_event(
         },
     }
 
+
 def publish_dead_letter_event(
     channel,
     original_body: bytes,
@@ -515,8 +516,6 @@ def main() -> None:
                     f"{investigation_generated_event['event_id']}"
                 )
 
-                
-
                 print()
                 print("SEZRA Investigation")
                 print()
@@ -623,6 +622,20 @@ def main() -> None:
                 failure_class="transient",
             )
             channel.basic_ack(delivery_tag=method.delivery_tag)
+
+
+def derive_investigation_subject(investigation_event: dict) -> str:
+    payload = investigation_event.get("payload", {})
+
+    subject = payload.get("subject")
+    if subject:
+        return subject
+
+    summary = payload.get("summary")
+    if summary:
+        return summary.split(".")[0]
+
+    return "Untitled investigation"
 
     channel.basic_consume(
         queue=QUEUE_NAME,

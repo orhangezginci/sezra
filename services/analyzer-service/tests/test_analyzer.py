@@ -1,5 +1,6 @@
 from main import build_investigation_search_text, build_investigation_summary
 from main import search_semantic_evidence, create_investigation_event
+from main import derive_investigation_subject
 
 
 def test_build_investigation_search_text():
@@ -136,3 +137,36 @@ def test_create_investigation_event():
     assert result["payload"]["subject"] == "antibiotic dose delayed"
     assert result["payload"]["summary"] == "Test summary"
     assert result["payload"]["evidence"] == evidence
+
+def test_derive_investigation_subject_uses_subject():
+    event = {
+        "payload": {
+            "subject": "antibiotic dose delayed",
+        }
+    }
+
+    result = derive_investigation_subject(event)
+
+    assert result == "antibiotic dose delayed"
+
+
+def test_derive_investigation_subject_falls_back_to_summary():
+    event = {
+        "payload": {
+            "summary": "Patient reports delayed medication. Extra details follow.",
+        }
+    }
+
+    result = derive_investigation_subject(event)
+
+    assert result == "Patient reports delayed medication"
+
+
+def test_derive_investigation_subject_falls_back_to_untitled():
+    event = {
+        "payload": {}
+    }
+
+    result = derive_investigation_subject(event)
+
+    assert result == "Untitled investigation"
