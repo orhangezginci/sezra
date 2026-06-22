@@ -12,7 +12,7 @@ echo
 
 echo "Subject"
 echo "-------"
-echo "$event_json" | jq -r '.payload.summary | split("\n")[0] | sub("^Investigation: "; "")'
+echo "$event_json" | jq -r '.payload.subject'
 
 echo
 echo "Evidence"
