@@ -126,6 +126,32 @@ def build_investigation_search_text(investigation_event: dict) -> str:
     return " ".join(parts)
 
 
+def derive_investigation_subject(investigation_event: dict) -> str:
+    payload = investigation_event.get("payload", {})
+
+    subject = payload.get("subject")
+    if subject:
+        return subject
+
+    summary = payload.get("summary")
+    if summary:
+        return summary.split(".")[0]
+
+    return "Untitled investigation"
+
+
+def derive_evidence_type(evidence: dict) -> str:
+    payload = evidence.get("payload") or {}
+
+    if payload.get("metric") or payload.get("value") is not None:
+        return "measurement"
+
+    if payload.get("from") or payload.get("subject"):
+        return "message"
+
+    return "unknown"
+
+
 def search_related_contexts(
     qdrant_client: QdrantClient,
     embedding_model: SentenceTransformer,
@@ -295,15 +321,17 @@ def search_semantic_evidence(
 
         seen_texts.add(text)
 
-        results.append(
-            {
-                "score": point.score,
-                "event_id": point.payload.get("event_id"),
-                "source": point.payload.get("source"),
-                "text": text,
-                "payload": point.payload.get("payload"),
-            }
-        )
+        evidence = {
+            "score": point.score,
+            "event_id": point.payload.get("event_id"),
+            "source": point.payload.get("source"),
+            "text": text,
+            "payload": point.payload.get("payload"),
+        }
+
+        evidence["evidence_type"] = derive_evidence_type(evidence)
+
+        results.append(evidence)
 
     return results
 
@@ -312,12 +340,7 @@ def build_investigation_summary(
     investigation_event: dict,
     evidence: list[dict],
 ) -> str:
-    payload = investigation_event.get("payload", {})
-
-    subject = payload.get(
-        "subject",
-        "unknown investigation",
-    )
+    subject = derive_investigation_subject(investigation_event)
 
     lines = [
         f"Investigation: {subject}",
@@ -372,8 +395,7 @@ def create_investigation_event(
     summary: str,
 ) -> dict:
     investigation_event_id = investigation_event["event_id"]
-    payload = investigation_event.get("payload", {})
-    subject = payload.get("subject", "")
+    subject = derive_investigation_subject(investigation_event)
 
     return {
         "event_id": str(uuid4()),
@@ -447,7 +469,6 @@ def main() -> None:
     connection = connect_to_rabbitmq()
     channel = connection.channel()
 
-    # Declare exchanges
     for exchange in (
         ANOMALY_EXCHANGE,
         INVESTIGATION_EXCHANGE,
@@ -477,26 +498,27 @@ def main() -> None:
 
             print(f"Received event: {event_type} ({event_id})")
 
-            # === Investigation Requested ===
             if event_type == "InvestigationRequested":
                 search_text = build_investigation_search_text(event)
-
-                print(f"Investigation search text: " f"{search_text}")
+                print(f"Investigation search text: {search_text}")
 
                 evidence = search_semantic_evidence(
                     qdrant_client=qdrant_client,
                     embedding_model=embedding_model,
                     search_text=search_text,
                 )
+
                 summary = build_investigation_summary(
                     investigation_event=event,
                     evidence=evidence,
                 )
+
                 investigation_generated_event = create_investigation_event(
                     investigation_event=event,
                     evidence=evidence,
                     summary=summary,
                 )
+
                 channel.basic_publish(
                     exchange=ANALYSIS_EXCHANGE,
                     routing_key="",
@@ -522,28 +544,25 @@ def main() -> None:
                 print(summary)
                 print()
 
-                print(f"Evidence candidates found: " f"{len(evidence)}")
+                print(f"Evidence candidates found: {len(evidence)}")
                 for item in evidence:
                     print(
                         f"Evidence candidate: "
+                        f"type={item.get('evidence_type')} "
                         f"score={item.get('score')} "
                         f"event_id={item.get('event_id')} "
                         f"source={item.get('source')} "
                         f"text={item.get('text')}"
                     )
 
-                channel.basic_ack(
-                    delivery_tag=method.delivery_tag,
-                )
+                channel.basic_ack(delivery_tag=method.delivery_tag)
                 return
 
-            # === Unsupported event type ===
             if event_type != "AnomalyDetected":
                 print(f"Skipping unsupported event type: {event_type}")
                 channel.basic_ack(delivery_tag=method.delivery_tag)
                 return
 
-            # === Anomaly Detected - main processing ===
             related_contexts = []
 
             for attempt in range(CONTEXT_SEARCH_RETRIES):
@@ -622,20 +641,6 @@ def main() -> None:
                 failure_class="transient",
             )
             channel.basic_ack(delivery_tag=method.delivery_tag)
-
-
-def derive_investigation_subject(investigation_event: dict) -> str:
-    payload = investigation_event.get("payload", {})
-
-    subject = payload.get("subject")
-    if subject:
-        return subject
-
-    summary = payload.get("summary")
-    if summary:
-        return summary.split(".")[0]
-
-    return "Untitled investigation"
 
     channel.basic_consume(
         queue=QUEUE_NAME,

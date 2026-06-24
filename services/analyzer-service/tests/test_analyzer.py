@@ -1,6 +1,6 @@
 from main import build_investigation_search_text, build_investigation_summary
 from main import search_semantic_evidence, create_investigation_event
-from main import derive_investigation_subject
+from main import derive_investigation_subject, derive_evidence_type
 
 
 def test_build_investigation_search_text():
@@ -68,13 +68,14 @@ def test_search_semantic_evidence_returns_qdrant_results():
     )
 
     assert result == [
-        {
-            "score": 0.9,
-            "event_id": "event-1",
-            "source": "test-source",
-            "text": "test evidence",
-            "payload": {"foo": "bar"},
-        }
+    {
+    "score": 0.9,
+    "event_id": "event-1",
+    "source": "test-source",
+    "text": "test evidence",
+    "payload": {"foo": "bar"},
+    "evidence_type": "unknown",
+    }  
     ]
 
 
@@ -138,6 +139,53 @@ def test_create_investigation_event():
     assert result["payload"]["summary"] == "Test summary"
     assert result["payload"]["evidence"] == evidence
 
+def test_derive_evidence_type_detects_measurement_from_metric():
+    evidence = {
+        "payload": {
+            "metric": "antibiotic_restock_delay_minutes",
+        }
+    }
+
+    result = derive_evidence_type(evidence)
+
+    assert result == "measurement"
+
+
+def test_derive_evidence_type_detects_measurement_from_value():
+    evidence = {
+        "payload": {
+            "value": 47,
+        }
+    }
+
+    result = derive_evidence_type(evidence)
+
+    assert result == "measurement"
+
+
+def test_derive_evidence_type_detects_message_from_email_fields():
+    evidence = {
+        "payload": {
+            "from": "pharmacy@example.com",
+            "subject": "Supplier change",
+        }
+    }
+
+    result = derive_evidence_type(evidence)
+
+    assert result == "message"
+
+
+def test_derive_evidence_type_falls_back_to_unknown():
+    evidence = {
+        "payload": {
+            "foo": "bar",
+        }
+    }
+
+    result = derive_evidence_type(evidence)
+
+    assert result == "unknown"
 def test_derive_investigation_subject_uses_subject():
     event = {
         "payload": {
