@@ -21,7 +21,7 @@ echo "--------"
 echo "$event_json" | jq -r '
 .payload.evidence
 | to_entries[]
-| "\n[\(.key + 1)] \(.value.text)\n    Source: \(.value.source)\n    Score : \((.value.score * 1000 | round) / 1000)"
+| "\n[\(.value.evidence_type // "unknown" | ascii_upcase)] \(.value.text)\n    Source: \(.value.source)\n    Score : \((.value.score * 1000 | round) / 1000)"
 '
 
 echo
