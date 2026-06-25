@@ -59,7 +59,28 @@ class FakeQdrantClient:
         assert limit == 5
         return FakeResponse()
 
+class FakeInvestigationRequestPoint:
+    score = 0.9
+    payload = {
+    "event_id": "investigation-123",
+    "event_type": "InvestigationRequested",
+    "source": "demo-script",
+    "text": '{"reason":"human_reported_issue"}',
+    "payload": {
+        "reason": "human_reported_issue",
+        "subject": "antibiotic dose delayed",
+    },
+}
 
+
+class FakeInvestigationRequestResponse:
+    points = [FakeInvestigationRequestPoint()]
+
+
+class FakeInvestigationRequestQdrantClient:
+    def query_points(self, collection_name, query, limit):
+        return FakeInvestigationRequestResponse()
+    
 def test_search_semantic_evidence_returns_qdrant_results():
     result = search_semantic_evidence(
         qdrant_client=FakeQdrantClient(),
@@ -78,6 +99,15 @@ def test_search_semantic_evidence_returns_qdrant_results():
     }  
     ]
 
+def test_search_semantic_evidence_excludes_current_investigation_request():
+    result = search_semantic_evidence(
+        qdrant_client=FakeInvestigationRequestQdrantClient(),
+        embedding_model=FakeEmbeddingModel(),
+        search_text="test",
+        excluded_event_id="investigation-123",
+    )
+
+    assert result == []
 
 def test_build_investigation_summary():
     event = {

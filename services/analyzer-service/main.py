@@ -298,6 +298,7 @@ def search_semantic_evidence(
     qdrant_client: QdrantClient,
     embedding_model: SentenceTransformer,
     search_text: str,
+    excluded_event_id: str | None = None,
     limit: int = 5,
 ) -> list[dict]:
     print(f"Semantic evidence query: {search_text}")
@@ -315,6 +316,18 @@ def search_semantic_evidence(
 
     for point in response.points:
         text = point.payload.get("text")
+        event_id = point.payload.get("event_id")
+        event_type = point.payload.get("event_type")
+
+        if event_type == "InvestigationRequested":
+            continue
+
+        if excluded_event_id and event_id == excluded_event_id:
+            continue
+
+        if event_type == "InvestigationRequested":
+            continue
+
 
         if not text or text in seen_texts:
             continue
@@ -323,7 +336,7 @@ def search_semantic_evidence(
 
         evidence = {
             "score": point.score,
-            "event_id": point.payload.get("event_id"),
+            "event_id": event_id,
             "source": point.payload.get("source"),
             "text": text,
             "payload": point.payload.get("payload"),
@@ -506,6 +519,7 @@ def main() -> None:
                     qdrant_client=qdrant_client,
                     embedding_model=embedding_model,
                     search_text=search_text,
+                    excluded_event_id=event_id,
                 )
 
                 summary = build_investigation_summary(
