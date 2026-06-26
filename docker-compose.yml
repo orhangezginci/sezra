@@ -121,6 +121,23 @@ services:
       - ./services/json-file-adapter:/app
       - ./data/json-inbox:/data/inbox
       - ./data/json-processed:/data/processed
+  level-1-enricher-service:
+    build:
+      context: .
+      dockerfile: services/level-1-enricher-service/Dockerfile
+    container_name: sezra-level-1-enricher-service
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    volumes:
+      - ./services/level-1-enricher-service:/app
+    profiles:
+      - enrichment
 
   anomaly-detector-service:
     profiles:
