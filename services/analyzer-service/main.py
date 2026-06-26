@@ -205,19 +205,23 @@ def build_summary(
 ) -> str:
     payload = anomaly_event.get("payload", {})
 
-    anomaly_type = payload.get("anomaly_type")
+    anomaly_type = get_anomaly_type(payload)
     metric = payload.get("metric", "unknown metric")
-    previous_value = payload.get("previous_value")
-    current_value = payload.get("current_value")
+    previous_value = get_anomaly_previous_value(payload)
+    current_value = get_anomaly_current_value(payload)
+    threshold = payload.get("threshold")
     drop_amount = payload.get("drop_amount")
     increase_amount = payload.get("increase_amount")
 
-    anomaly_label = f"{anomaly_type} anomaly" if anomaly_type else "anomaly"
+    summary = f'SEZRA detected a {anomaly_type} anomaly for metric "{metric}". '
 
-    summary = (
-        f'SEZRA detected a {anomaly_label} for metric "{metric}". '
-        f"The value changed from {previous_value} to {current_value}."
-    )
+    if previous_value is not None:
+        summary += f"The value changed from {previous_value} to {current_value}."
+    else:
+        summary += f"The current value is {current_value}."
+
+    if threshold is not None:
+        summary += f" Threshold: {threshold}."
 
     if drop_amount is not None:
         summary += f" Detected drop amount: {drop_amount}."
@@ -242,29 +246,39 @@ def build_human_readable_analysis(
 ) -> dict:
     payload = anomaly_event.get("payload", {})
 
-    anomaly_type = payload.get("anomaly_type", "unknown")
+    anomaly_type = get_anomaly_type(payload)
     metric = payload.get("metric", "unknown metric")
-    previous_value = payload.get("previous_value")
-    current_value = payload.get("current_value")
+    previous_value = get_anomaly_previous_value(payload)
+    current_value = get_anomaly_current_value(payload)
+    threshold = payload.get("threshold")
     increase_amount = payload.get("increase_amount")
     drop_amount = payload.get("drop_amount")
 
     title = f"{anomaly_type.capitalize()} anomaly detected"
 
-    detected_anomaly = (
-        f'Metric "{metric}" changed from {previous_value} to {current_value}.'
-    )
+    if previous_value is not None:
+        detected_anomaly = (
+            f'Metric "{metric}" changed from '
+            f"{previous_value} to {current_value}."
+        )
+    else:
+        detected_anomaly = (
+            f'Metric "{metric}" has current value {current_value}.'
+        )
+
+    if threshold is not None:
+        detected_anomaly += f" Threshold: {threshold}."
 
     if increase_amount is not None:
         detected_anomaly += f" Increase amount: {increase_amount}."
+
     if drop_amount is not None:
         detected_anomaly += f" Drop amount: {drop_amount}."
 
-    most_relevant_context = (
-        related_contexts[0].get("text")
-        if related_contexts
-        else "No relevant contextual signal was found."
-    )
+    if related_contexts:
+        most_relevant_context = related_contexts[0].get("text")
+    else:
+        most_relevant_context = "No relevant contextual signal was found."
 
     possible_interpretation = (
         "The related context may help explain the detected anomaly. "
@@ -277,8 +291,6 @@ def build_human_readable_analysis(
         "most_relevant_context": most_relevant_context,
         "possible_interpretation": possible_interpretation,
     }
-
-
 def print_human_readable_analysis(human_readable: dict) -> None:
     print()
     print("SEZRA Analysis")
@@ -325,10 +337,6 @@ def search_semantic_evidence(
         if excluded_event_id and event_id == excluded_event_id:
             continue
 
-        if event_type == "InvestigationRequested":
-            continue
-
-
         if not text or text in seen_texts:
             continue
 
@@ -347,6 +355,18 @@ def search_semantic_evidence(
         results.append(evidence)
 
     return results
+
+
+def get_anomaly_current_value(payload: dict):
+    return payload.get("current_value", payload.get("value"))
+
+
+def get_anomaly_previous_value(payload: dict):
+    return payload.get("previous_value")
+
+
+def get_anomaly_type(payload: dict) -> str:
+    return payload.get("anomaly_type", "threshold_exceeded")
 
 
 def build_investigation_summary(
