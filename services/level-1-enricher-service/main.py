@@ -7,7 +7,6 @@ from uuid import uuid4
 
 import pika
 
-
 RAW_EXCHANGE = "sezra.stream.raw"
 ENRICHED_EXCHANGE = "sezra.stream.enriched"
 QUEUE_NAME = "sezra.queue.level_1_enricher"
@@ -66,6 +65,24 @@ def collect_scalar_fields(payload: dict, prefix: str = "") -> list[str]:
     return parts
 
 
+def update_lifecycle(event: dict, stage: str) -> dict:
+    lifecycle = dict(event.get("lifecycle", {}))
+    history = list(lifecycle.get("history", []))
+
+    history.append(
+        {
+            "stage": stage,
+            "service": "level-1-enricher-service",
+            "occurred_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+
+    lifecycle["stage"] = stage
+    lifecycle["history"] = history
+
+    return lifecycle
+
+
 def build_semantic_text(event: dict) -> str:
     payload = event.get("payload", {})
 
@@ -91,19 +108,27 @@ def create_enriched_event(event: dict) -> dict:
     payload = dict(event.get("payload", {}))
 
     payload["semantic_text"] = build_semantic_text(event)
-    payload["enrichment"] = {
+    payload["enrichments"] = [
+    {
         "level": 1,
         "service": "level-1-enricher-service",
         "strategy": "generic scalar field expansion",
         "occurred_at": datetime.now(timezone.utc).isoformat(),
     }
+]
 
     enriched_event["payload"] = payload
     enriched_event["event_id"] = str(uuid4())
     enriched_event["source"] = "level-1-enricher-service"
     enriched_event["causation_id"] = event.get("event_id")
-    enriched_event["correlation_id"] = event.get("correlation_id") or event.get("event_id")
+    enriched_event["correlation_id"] = event.get("correlation_id") or event.get(
+        "event_id"
+    )
 
+    enriched_event["lifecycle"] = update_lifecycle(
+        event=event,
+        stage="enriched",
+    )
     return enriched_event
 
 
@@ -113,8 +138,12 @@ def main() -> None:
     connection = connect_to_rabbitmq()
     channel = connection.channel()
 
-    channel.exchange_declare(exchange=RAW_EXCHANGE, exchange_type="fanout", durable=True)
-    channel.exchange_declare(exchange=ENRICHED_EXCHANGE, exchange_type="fanout", durable=True)
+    channel.exchange_declare(
+        exchange=RAW_EXCHANGE, exchange_type="fanout", durable=True
+    )
+    channel.exchange_declare(
+        exchange=ENRICHED_EXCHANGE, exchange_type="fanout", durable=True
+    )
 
     channel.queue_declare(queue=QUEUE_NAME, durable=True)
     channel.queue_bind(exchange=RAW_EXCHANGE, queue=QUEUE_NAME)
