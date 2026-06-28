@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import pika
 
+
 RAW_EXCHANGE = "sezra.stream.raw"
 ENRICHED_EXCHANGE = "sezra.stream.enriched"
 QUEUE_NAME = "sezra.queue.level_1_enricher"
@@ -107,15 +108,20 @@ def create_enriched_event(event: dict) -> dict:
     enriched_event = dict(event)
     payload = dict(event.get("payload", {}))
 
+    existing_enrichments = payload.get("enrichments", [])
+    if not isinstance(existing_enrichments, list):
+        existing_enrichments = []
+
     payload["semantic_text"] = build_semantic_text(event)
     payload["enrichments"] = [
-    {
-        "level": 1,
-        "service": "level-1-enricher-service",
-        "strategy": "generic scalar field expansion",
-        "occurred_at": datetime.now(timezone.utc).isoformat(),
-    }
-]
+        *existing_enrichments,
+        {
+            "level": 1,
+            "service": "level-1-enricher-service",
+            "strategy": "generic scalar field expansion",
+            "occurred_at": datetime.now(timezone.utc).isoformat(),
+        },
+    ]
 
     enriched_event["payload"] = payload
     enriched_event["event_id"] = str(uuid4())
@@ -129,6 +135,7 @@ def create_enriched_event(event: dict) -> dict:
         event=event,
         stage="enriched",
     )
+
     return enriched_event
 
 
@@ -139,10 +146,14 @@ def main() -> None:
     channel = connection.channel()
 
     channel.exchange_declare(
-        exchange=RAW_EXCHANGE, exchange_type="fanout", durable=True
+        exchange=RAW_EXCHANGE,
+        exchange_type="fanout",
+        durable=True,
     )
     channel.exchange_declare(
-        exchange=ENRICHED_EXCHANGE, exchange_type="fanout", durable=True
+        exchange=ENRICHED_EXCHANGE,
+        exchange_type="fanout",
+        durable=True,
     )
 
     channel.queue_declare(queue=QUEUE_NAME, durable=True)
